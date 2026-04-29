@@ -5,6 +5,9 @@ pydantic-settings==2.6.1
 python-json-logger==2.0.7
 httpx==0.27.2
 
+# Stdio MCP bridge for Task 4.3 (OpenCode local MCP subprocess → POST /rpc)
+mcp>=1.8,<2
+
 # MCP server (Task 2.2): code_check uses pyflakes via subprocess
 pyflakes==3.2.0
 

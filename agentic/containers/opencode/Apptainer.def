@@ -1,0 +1,111 @@
+Bootstrap: localimage
+From: ../mcp/mcp.sif
+Stage: build
+
+# ---------------------------------------------------------------------------
+# chat-ai OpenCode (sst/opencode) agent image (Task 4.3).
+#
+# Boots from ../mcp/mcp.sif. Adds the OpenCode CLI (GitHub release tarball),
+# ``mcp`` Python package (stdio MCP bridge), and ``opencode_runtime/``.
+#
+# Default:
+#     python3.11 -m opencode_runtime.launcher
+#
+# Smoke/tests: OPENCODE_DEV_COMMAND_OVERRIDE=/bin/true skips the real CLI.
+# ---------------------------------------------------------------------------
+
+%files
+    ../../opencode_runtime /opt/agentic/opencode_runtime
+    entrypoint.sh /opt/agentic/entrypoint.sh
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export PATH=/usr/local/bin:/usr/bin:/bin
+
+    apt-get update -qq
+    apt-get install -y --no-install-recommends bash ca-certificates curl tar bzip2
+    rm -rf /var/lib/apt/lists/*
+
+    case "$(uname -m)" in
+        aarch64)
+            OC_TARGET=linux-arm64
+            ;;
+        arm64)
+            OC_TARGET=linux-arm64
+            ;;
+        *)
+            OC_TARGET=linux-x64
+            ;;
+    esac
+
+    OC_TGZ="opencode-${OC_TARGET}.tar.gz"
+    TMP="/tmp/ocdl"
+    mkdir -p "$TMP"
+    curl -fsSL -o "${TMP}/${OC_TGZ}" \
+        "https://github.com/anomalyco/opencode/releases/latest/download/${OC_TGZ}"
+    tar -xzf "${TMP}/${OC_TGZ}" -C "$TMP"
+    install -m 0755 "${TMP}/opencode" /usr/local/bin/opencode
+    rm -rf "$TMP"
+
+    chmod +x /opt/agentic/entrypoint.sh
+    cd /opt/agentic
+    python3.11 -m pip install --no-cache-dir 'mcp>=1.8,<2'
+    PYTHONPATH=/opt/agentic:${PYTHONPATH:-} python3.11 -c \
+        "import opencode_runtime.launcher; import opencode_runtime.mcp_stdio_gateway"
+    python3.11 -c "from mcp_server.main import app" || { echo "mcp_server import failed"; exit 1; }
+
+    opencode --version
+
+    : "${BUILD_SHA:=unknown}"
+    : "${BUILD_DATE:=unknown}"
+    cat > /etc/chat-ai-image-info <<EOF
+image=opencode
+task=4.3
+version=0.1.0
+git_sha=${BUILD_SHA}
+build_date=${BUILD_DATE}
+parent=mcp
+mcp_port=8080
+EOF
+
+%environment
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PATH=/usr/local/bin:/usr/bin:/bin
+    export PYTHONPATH=/opt/agentic:${PYTHONPATH:-}
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONUNBUFFERED=1
+    export MCP_SERVER_URL=${MCP_SERVER_URL:-http://localhost:8080}
+    export MCP_SERVER_PORT=${MCP_SERVER_PORT:-8080}
+
+%runscript
+    #!/bin/sh
+    if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+        cat <<EOF
+chat-ai OpenCode image (Task 4.3): runs python3.11 -m opencode_runtime.launcher
+Pass argv to bypass (opencode --help, /bin/sh, …).
+
+EOF
+        exit 0
+    fi
+    if [ "$#" -gt 0 ]; then
+        exec "$@"
+    fi
+    exec /opt/agentic/entrypoint.sh
+
+%startscript
+    exec /opt/agentic/entrypoint.sh
+
+%labels
+    org.chat-ai.image opencode
+    org.chat-ai.task 4.3
+    org.chat-ai.version 0.1.0
+    org.chat-ai.parent mcp
+    org.chat-ai.mcp_port 8080
+    org.chat-ai.framework opencode-cli
+    org.opencontainers.image.title chat-ai-opencode-agent
+    org.opencontainers.image.description OpenCode CLI + stdio MCP bridge + MCP JSON-RPC for chat-ai
+
+%help
+    Task 4.3 — see README.md under agentic/containers/opencode/

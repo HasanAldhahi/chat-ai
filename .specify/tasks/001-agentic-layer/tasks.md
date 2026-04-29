@@ -900,7 +900,7 @@ Package the Hugging Face smolagents framework inside the Apptainer container wit
 ---
 
 ### Task 4.3: sst/opencode Packaging
-**Status:** 🟡 IN PROGRESS
+**Status:** 🟢 COMPLETE (implementation; cluster E2E with real LLM = ops)
 **Priority:** LOW
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -930,7 +930,16 @@ Package the sst/opencode framework inside the Apptainer container with MCP suppo
 - Document configuration
 - Code reviewed and merged
 
-**🟡 Scaffold (2026-04-29):** `agentic/containers/opencode/README.md`; full image — TODO.
+**✅ Implementation note (2026-04-29):**
+- **`opencode_runtime/`**: **`launcher`** (MCP uvicorn → **`/health`** → writes **`~/.config/opencode/opencode.json`** → **`opencode run …`** + **`openhands_runtime.sse_forwarder`** toward broker SSE), **`mcp_stdio_gateway`** (OpenCode **`type: local`** stdio MCP → **`POST …/rpc`** JSON-RPC **`list_tools` / `call_tool`**).
+- **Deps:** **`mcp` (PyPI)** in **`agentic/requirements.txt`** (stdio MCP server primitives).
+- **Image:** `containers/opencode/Apptainer.def` installs **OpenCode** from **`anomalyco/opencode` release tarball**, copies **`opencode_runtime/`**; **`entrypoint.sh`** → **`python3.11 -m opencode_runtime.launcher`**.
+- **Tests:** `tests/test_opencode_config.py`, `tests/test_opencode_mcp_stdio_gateway.py`, **`test_apptainer_opencode`** (static recipe); full **`pytest`** passes.
+- **Smoke:** `OPENCODE_DEV_COMMAND_OVERRIDE=/bin/true` bypasses the real OpenCode binary (like Goose); production needs **`OPENAI_API_KEY`**, **`OPENAI_BASE_URL`**, and **`OPENCODE_MODEL`** (or override config) for the cluster LLM.
+
+**Branch stack:** **`task-4.3-sst-opencode-packaging`** from **`task-4.1-goose-agent-packaging`** (Task 4.2 skipped).
+
+**🟡 Scaffold (2026-04-29):** — superseded by implementation above.
 
 ---
 
