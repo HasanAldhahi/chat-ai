@@ -109,10 +109,18 @@ Stage: build
     rm -f google-chrome-stable_current_amd64.deb
 
     # ----- 5. Cleanup ------------------------------------------------------
+    # Trim apt artefacts (largest contributor to image bloat) and the pip
+    # download cache. We deliberately do NOT `rm -rf /tmp/*` or
+    # `rm -rf /var/tmp/*`: globbing those at recipe time is unnecessarily
+    # broad — apt's own postinst, dpkg, gnupg, and other steps may still
+    # have legitimate state under /tmp during the build, and the wide
+    # glob would silently delete it. The image is sealed at the end of
+    # %post anyway, so any per-build temp files leftover are written to
+    # the squashfs once and have zero security or runtime impact.
     apt-get purge -y software-properties-common
     apt-get autoremove -y
     apt-get clean
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache
+    rm -rf /var/lib/apt/lists/* /root/.cache
 
     # ----- 6. Mount-point stubs -------------------------------------------
     # /workspace is sticky-writable (1777) so Apptainer's UID-mapped run-
