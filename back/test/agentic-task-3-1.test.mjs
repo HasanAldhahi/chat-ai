@@ -21,9 +21,14 @@ describe("agentic-routes helpers (Task 3.1)", () => {
     assert.strictEqual(mapAgenticStatus(422), 422);
   });
 
-  test("mapAgenticStatus maps 502/503 to 500", () => {
-    assert.strictEqual(mapAgenticStatus(502), 500);
-    assert.strictEqual(mapAgenticStatus(503), 500);
+  test("mapAgenticStatus maps 502/503 to 503 (Task 3.4)", () => {
+    assert.strictEqual(mapAgenticStatus(502), 503);
+    assert.strictEqual(mapAgenticStatus(503), 503);
+  });
+
+  test("mapAgenticStatus preserves 504 and maps other 5xx to 500", () => {
+    assert.strictEqual(mapAgenticStatus(504), 504);
+    assert.strictEqual(mapAgenticStatus(500), 500);
   });
 
   test("mapAgenticStatus passes other errors", () => {
@@ -170,7 +175,7 @@ describe("Task 3.1 broker proxy integration (mock broker)", () => {
     }),
   );
 
-  test("POST /api/chat/agent forwards JSON, injects user_id, maps 502→500", async () => {
+  test("POST /api/chat/agent forwards JSON, injects user_id, maps 502→503", async () => {
     const r1 = await fetch(`http://127.0.0.1:${port}/api/chat/agent`, {
       method: "POST",
       headers: {
@@ -201,7 +206,7 @@ describe("Task 3.1 broker proxy integration (mock broker)", () => {
         bad: true,
       }),
     });
-    assert.strictEqual(r2.status, 500);
+    assert.strictEqual(r2.status, 503);
     const j2 = await r2.json();
     assert.ok(typeof j2.error === "string");
   });

@@ -1,7 +1,17 @@
 import OpenAI from "openai";
+import {
+  resolveAgenticXUser,
+  resolveBackendBaseUrl,
+} from "../utils/agentBrokerSse";
+import { isChatAiAgentModel } from "../constants/chatAiAgentModels";
 
 // Controller for handling API request cancellation
 let controller = new AbortController();
+
+/** Same signal attached to in-flight agent/chat fetch — use for parallel SSE. */
+export function getActiveRequestSignal() {
+  return controller.signal;
+}
 
 function brokerMessages(messages) {
   return messages.map((m) => {
@@ -18,14 +28,10 @@ function brokerMessages(messages) {
 
 /**
  * Agent models: Node `/api/chat/agent` → FastAPI → vLLM (Tasks 3.1 + 2.6).
+ * Retries transient browser network failures (Task 3.4).
  */
-async function* agentChatCompletions(conversation, timeout = 30000) {
-  let baseURL = import.meta.env.VITE_BACKEND_ENDPOINT;
-  try {
-    baseURL = new URL(baseURL).toString();
-  } catch {
-    baseURL = new URL(baseURL, window.location.origin).toString();
-  }
+async function* agentChatCompletions(conversation, timeout = 30000, hooks = {}) {
+  const baseURL = resolveBackendBaseUrl();
   const agentUrl = new URL("api/chat/agent", baseURL).toString();
   const model =
     typeof conversation.settings.model === "string"
@@ -43,20 +49,42 @@ async function* agentChatCompletions(conversation, timeout = 30000) {
     top_p: conversation.settings.top_p ?? 0.5,
   };
 
-  const xUser =
-    import.meta.env.VITE_AGENTIC_X_USER ||
-    import.meta.env.VITE_X_USER ||
-    "dev@gwdg";
+  const xUser = resolveAgenticXUser();
 
-  const res = await fetch(agentUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User": xUser,
-    },
-    body: JSON.stringify(body),
-    signal: controller.signal,
-  });
+  const maxAttempts = 3;
+  let res;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      res = await fetch(agentUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User": xUser,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      break;
+    } catch (err) {
+      if (err?.name === "AbortError") throw err;
+      const transient =
+        err instanceof TypeError ||
+        (typeof err?.message === "string" &&
+          /network|failed to fetch|load failed|networkerror|connection/i.test(
+            err.message,
+          ));
+      if (!transient || attempt === maxAttempts) {
+        const e = new Error(
+          err?.message ||
+            "Connection lost. Retrying failed — please try again.",
+        );
+        e.status = 0;
+        throw e;
+      }
+      hooks.onAgentConnectionRetry?.(attempt);
+      await new Promise((r) => setTimeout(r, 600 * attempt));
+    }
+  }
 
   if (!res.ok) {
     let errObj = {};
@@ -67,6 +95,7 @@ async function* agentChatCompletions(conversation, timeout = 30000) {
     }
     const e = new Error(errObj.error || res.statusText || "Agent chat failed");
     e.status = res.status;
+    if (errObj.code) e.code = errObj.code;
     throw e;
   }
 
@@ -104,6 +133,7 @@ async function* chatCompletions (
   conversation,
   timeout = 30000,
   stream = true,
+  hooks = {},
 ) {
   try {
     const model = typeof conversation.settings.model === 'string'
@@ -117,8 +147,8 @@ async function* chatCompletions (
           conversation.settings.model?.id ||
           "";
 
-    if (String(modelLabel).toLowerCase().includes("agent")) {
-      yield* agentChatCompletions(conversation, timeout);
+    if (isChatAiAgentModel(conversation.settings.model)) {
+      yield* agentChatCompletions(conversation, timeout, hooks);
       return;
     }
 

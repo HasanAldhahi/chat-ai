@@ -17,12 +17,18 @@ export function useUpdateModelsData() {
       if (data instanceof Response) {
         if (data.status === 401) openModal("errorSessionExpired");
         else notifyError(`Failed to fetch models: ${data.status} ${data.statusText}`);
+        setModelsData([...CHAT_AI_AGENT_MODELS]);
+        return;
+      }
+
+      if (data === null) {
+        notifyError("Error fetching models");
+        setModelsData([...CHAT_AI_AGENT_MODELS]);
         return;
       }
 
       if (Array.isArray(data) && data.length === 0) {
         notifyError("No models available or network error");
-        return;
       }
       setModelsData([...CHAT_AI_AGENT_MODELS, ...data]);
     } catch {

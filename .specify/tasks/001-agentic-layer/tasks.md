@@ -648,7 +648,7 @@ Modify the existing Node.js Express backend to detect agent model selection and 
 - X-User header forwarded to FastAPI broker
 - SSE stream from FastAPI proxied to frontend without modification
 - FastAPI 400/401/403 errors translated to same status in Node response
-- FastAPI 502/503 errors translated to 500 Internal Server Error
+- FastAPI 502/503 errors translated to **503** at the Node proxy (Task 3.4)
 - Request body format matches FastAPI expectations
 - Streaming from FastAPI to frontend works end-to-end
 
@@ -707,13 +707,13 @@ Update the React model dropdown to include agent options and distinguish them vi
 - Code reviewed and merged
 - Update documentation with screenshots
 
-**✅ Implementation note (2026-04-29):** `front/src/constants/chatAiAgentModels.js` — four agent rows (incl. smolagents), `isChatAiAgentModel`, extended-field stubs for `ModelSelectorExtended`. `useUpdateModelsData.jsx` prepends catalog. `ModelSelectorSimple` / `ModelSelectorExtended`: **Agents** vs **Chat models** sections, i18n tooltips (`model_selector.*`). `ModelSelectorWrapper`: clears `messages` / `messageCount` when toggling **chat model ↔ agent** (via `getDefaultConversation()` seeds). **Fix:** Extended selector now calls `onChange` (replaced broken `setSelectedModel`). Merge via branch **`task-3.2-react-agent-model-selection`** → `001-agentic-layer`.
+**✅ Implementation note (2026-04-29):** `front/src/constants/chatAiAgentModels.js` — four agent rows (incl. smolagents), `isChatAiAgentModel`, extended-field stubs for `ModelSelectorExtended`. `useUpdateModelsData.jsx` prepends catalog. `ModelSelectorSimple` / `ModelSelectorExtended`: **Agents** vs **Chat models** sections, i18n tooltips (`model_selector.*`). `ModelSelectorWrapper`: clears `messages` / `messageCount` when toggling **chat model ↔ agent** (via `getDefaultConversation()` seeds). **Fix:** Extended selector now calls `onChange` (replaced broken `setSelectedModel`). Merge via branch **`task-3.2-react-agent-model-selection`** → `001-agentic-layer`. **Tests:** `front/npm test` includes `chatAiAgentModels.test.js` (`isChatAiAgentModel`).
 
 ---
 
 ### Task 3.3: React Frontend - Real-Time Streaming UI
 **Git branch:** `task-3.3-react-streaming-ui`
-**Status:** 🟡 IN PROGRESS
+**Status:** ✅ COMPLETE (2026-04-29)
 **Priority:** HIGH
 **Est. Effort:** 3-4 days
 **Assignee:** TBD
@@ -765,15 +765,17 @@ Implement UI components to parse and display SSE messages from the FastAPI broke
 - Code reviewed and merged
 - Update documentation with screenshots of agent UI
 
-**🟡 Partial (2026-04-29):** Agent model traffic uses `front/src/apis/chatCompletions.jsx` → `fetch` to `/api/chat/agent`, parses SSE `data:` lines into the existing streaming assistant loop (token/chunk path). **Not done:** dedicated gray action/result boxes, per-tool icons, “Show more”, separate “Stop Agent” control — still standard stop/generation UX.
+**✅ Implementation note (2026-04-29):** Parallel **GET `/api/chat/agent/sse`** via `front/src/utils/agentBrokerSse.js` (`startAgentBrokerSse`, shared `AbortSignal` from `getActiveRequestSignal()` in `chatCompletions.jsx`). SSE frames (`event:` + `data:` JSON) append to `assistant.agentActivities` in `sendMessage.jsx` while POST stream updates reply text; activities preserved through finalize. UI: `AgentActivityFeed.jsx` (gray action/result, red error, tool icons, timestamps, Show more/less). **Stop Agent** tooltip on `AbortButton` when an agent model is selected. Agent detection in `chatCompletions.jsx` uses `isChatAiAgentModel`. **Tests:** `front/npm test` covers `parseAgentSseBlock`, `readAgentSseBody`, `normalizeAgentSseActivity`, `toolIconForType`.
+
+**Branch stack (2026-04-29):** Implement 3.3 on **`task-3.3-react-streaming-ui`**, branching from **`task-3.2-react-agent-model-selection`** (same tip until the first 3.3 commit); see `.specify/plans/001-agentic-layer/plan.md` → *Git branching (stacked task branches)*.
 
 **Branch stack (2026-04-29):** Implement 3.3 on **`task-3.3-react-streaming-ui`**, branching from **`task-3.2-react-agent-model-selection`** (same tip until the first 3.3 commit); see `.specify/plans/001-agentic-layer/plan.md` → *Git branching (stacked task branches)*.
 
 ---
 
 ### Task 3.4: Error Handling & User Feedback
-**Git branch:** `task-3.4-error-handling-feedback`
-**Status:** 🟡 IN PROGRESS
+**Git branch:** `task-3.4-agentic-error-handling`
+**Status:** ✅ COMPLETE (2026-04-29)
 **Priority:** MEDIUM
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -820,7 +822,9 @@ Backend (Node.js):
 - Document error messages and retry logic
 - Add monitoring for error rates
 
-**🟡 Partial (2026-04-29):** Node maps broker 502/503 → 500; 4xx forwarded. Frontend/agent path relies on existing toast patterns for fetch failures; exhaustive copy for Slurm/container/timeout scenarios not fully mapped in UI.
+**✅ Implementation note (2026-04-29):** Branch **`task-3.4-agentic-error-handling`** from **`task-3.3-react-streaming-ui`**. **Node** (`back/agentic-routes.mjs`): **502/503 → 503**; **504** preserved; other broker **5xx → 500**; POST broker fetch uses `AbortSignal.timeout` (`AGENTIC_BROKER_TIMEOUT_MS`, default 30m) → **504** + timeout body; connection errors → **503** with user copy; missing `X-User` → **401** with login copy. **Front**: `agenticErrors.js` maps status + broker strings (Slurm job id, container/workspace start, session ended, auth, permission, timeout); agent `fetch` **retries ×3** on transient network errors + toast `agentic.retrying_connection`; `sendMessage` stores **`agenticError`** on assistant bubble; `MessageAssistant` shows in-chat alert + **Retry** when `retryable`. **Tests:** `front/npm test` (Vitest: `agenticErrors`, `agentBrokerSse`, `chatAiAgentModels`).
+
+**Branch stack:** **`task-3.4-agentic-error-handling`** builds on **`task-3.3-react-streaming-ui`**.
 
 ---
 

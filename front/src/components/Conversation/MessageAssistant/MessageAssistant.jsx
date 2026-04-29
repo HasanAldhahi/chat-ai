@@ -12,6 +12,8 @@ import { createConversation, newId, saveFile, loadFile } from "../../../db";
 import { useToast } from "../../../hooks/useToast";
 import FeedbackButtons from "./FeedbackButtons";
 import ForkButton from "./ForkButton";
+import AgentActivityFeed from "./AgentActivityFeed";
+import { useTranslation } from "react-i18next";
 
 // Constants
 const MAX_HEIGHT = 200;
@@ -31,6 +33,7 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
   
   const sendMessage = useSendMessage();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { notifySuccess, notifyError } = useToast();
   const [forking, setForking] = useState(false);
   const feedbackModule = import.meta.env.VITE_MODULE_FEEDBACK === "true";
@@ -259,6 +262,24 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
 
   const content = message?.content?.[0]?.text ?? "";
   const isContentEmpty = !content.trim();
+  const agentActivities = message?.agentActivities ?? [];
+  const hasAgentUi = agentActivities.length > 0;
+
+  const toggleAgentActivity = useCallback(
+    (activityId) => {
+      setLocalState((prev) => {
+        const messages = [...prev.messages];
+        const m = { ...messages[message_index] };
+        m.agentActivities = (m.agentActivities || []).map((x) =>
+          x.id === activityId ? { ...x, expanded: !x.expanded } : x,
+        );
+        messages[message_index] = m;
+        return { ...prev, messages, flush: true };
+      });
+    },
+    [message_index, setLocalState],
+  );
+
   return (
     <div
       key={message_index}
@@ -267,16 +288,46 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
           rounded-2xl bg-bg_chat dark:bg-bg_chat_dark
           ${editMode ? "px-1 pt-1" : "px-3 pt-3"}
           ${
-            isContentEmpty && !loading
+            isContentEmpty && !loading && !hasAgentUi
               ? "bg-bg_chat/50 dark:bg-bg_chat_dark/50 pt-0"
               : " bg-bg_chat dark:bg-bg_chat_dark"
           }`}
     >
+      {message?.agenticError && (
+        <div
+          className="mb-2 rounded-lg border border-red-300 bg-red-50 px-2.5 py-2 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100"
+          role="alert"
+        >
+          <div className="flex items-start gap-2">
+            <span className="shrink-0" aria-hidden="true">
+              ⚠️
+            </span>
+            <p className="min-w-0 flex-1 leading-snug break-words">
+              {message.agenticError.message}
+            </p>
+          </div>
+          {message.agenticError.retryable ? (
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="mt-2 text-xs font-medium text-red-800 underline dark:text-red-200 cursor-pointer"
+            >
+              {t("common.retry")}
+            </button>
+          ) : null}
+        </div>
+      )}
       {isContentEmpty ? (
         <div
           className={`flex flex-col
             ${loading ? "pb-4" : "pb-3"}`}
         >
+          {hasAgentUi && (
+            <AgentActivityFeed
+              activities={agentActivities}
+              onToggleExpand={toggleAgentActivity}
+            />
+          )}
           {loading && <Typing />}
           {!loading && (
             <div className="flex flex-col items-center justify-start gap-3 py-1">
@@ -385,6 +436,12 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
           {/* Display message content */}
           {!editMode && !feedbackMode && (
             <div className="flex flex-col gap-4">
+              {hasAgentUi && (
+                <AgentActivityFeed
+                  activities={agentActivities}
+                  onToggleExpand={toggleAgentActivity}
+                />
+              )}
               <MarkdownRenderer isLoading={loading} renderMode={renderMode}>
                 {message.content[0]?.text}
               </MarkdownRenderer>

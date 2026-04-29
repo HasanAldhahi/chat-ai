@@ -4,6 +4,7 @@ import Tooltip from "../Others/Tooltip";
 import { Trans, useTranslation } from "react-i18next";
 import { abortRequest } from "../../apis/chatCompletions";
 import { useToast } from "../../hooks/useToast";
+import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
 
 export default function AbortButton({
     localState,
@@ -16,13 +17,15 @@ export default function AbortButton({
     ? localState.messages[localState.messages.length - 2]?.loading || false
     : false;
 
+    const isAgentModel = isChatAiAgentModel(localState?.settings?.model);
+
     // Handle cancellation of ongoing request
     const handleAbort = () => {
         abortRequest(notifyError);
     };
 
     return loading && (
-         <Tooltip text={t("common.abort")}>
+         <Tooltip text={isAgentModel ? t("common.stop_agent") : t("common.abort")}>
             {/* Abort Button */}
             <button className="h-[30px] w-[30px] cursor-pointer">
             <img

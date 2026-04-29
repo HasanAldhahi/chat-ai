@@ -7,15 +7,14 @@ export async function getModelsData() {
       return response;
     }
     // Extract model data from response
-    const { data: modelsData } = await response.json();
-    // Enrich model data with names if not present
-    const enrichedModelsData = modelsData.map((model) => ({
+    const body = await response.json();
+    const modelsData = Array.isArray(body?.data) ? body.data : [];
+    return modelsData.map((model) => ({
       ...model,
       name: model.name || model.id,
     }));
-    return enrichedModelsData;
   } catch (error) {
     console.error("Failed to load models data", error);
-    return []
+    return null;
   }
 }
