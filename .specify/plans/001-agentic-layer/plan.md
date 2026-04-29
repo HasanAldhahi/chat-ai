@@ -4,6 +4,21 @@
 
 This plan breaks down the specification for adding an autonomous AI agent layer to the existing Chat AI application into manageable implementation phases. The implementation follows security-first principles and maintains seamless integration with existing infrastructure.
 
+## Git branching (stacked task branches — Option A)
+
+Each feature uses **one branch per task**, with **no merge commits inside the task chain**: the branch tip is **exactly one commit** on top of the **previous task branch tip**. Merge that branch into **`001-agentic-layer`** when the task is done.
+
+**Phase 3 dependency line (verify with `git log -1 --oneline <branch>` and first parent):**
+
+| Branch | Tip role | Builds on |
+|--------|----------|-----------|
+| `task-2.6-vllm-integration` | Task 2.6 (vLLM + broker/UI bundle in `2ed5263`) | `task-2.5-network-filtering` (`fa1d5b2`) |
+| `task-3.1-node-backend-modification` | Task 3.1 | `task-2.6-vllm-integration` |
+| `task-3.2-react-agent-model-selection` | Task 3.2 | `task-3.1-*` |
+| `task-3.3-react-streaming-ui` | Task 3.3 (in progress) | `task-3.2-*` |
+
+Start new work: `git checkout task-3.2-react-agent-model-selection && git pull && git checkout -b task-3.3-…` — or reset `task-3.3-*` to match `task-3.2` until the first Task 3.3 commit. Prefer **not** branching `task-3.3` from `001` if `001` has extra doc-only commits: that obscures the task stack; merge `001` into your task branch only when you need those files.
+
 ## Architecture Components
 
 ```

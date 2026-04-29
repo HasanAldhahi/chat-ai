@@ -751,6 +751,8 @@ Implement UI components to parse and display SSE messages from the FastAPI broke
 
 **🟡 Partial (2026-04-29):** Agent model traffic uses `front/src/apis/chatCompletions.jsx` → `fetch` to `/api/chat/agent`, parses SSE `data:` lines into the existing streaming assistant loop (token/chunk path). **Not done:** dedicated gray action/result boxes, per-tool icons, “Show more”, separate “Stop Agent” control — still standard stop/generation UX.
 
+**Branch stack (2026-04-29):** Implement 3.3 on **`task-3.3-react-streaming-ui`**, branching from **`task-3.2-react-agent-model-selection`** (same tip until the first 3.3 commit); see `.specify/plans/001-agentic-layer/plan.md` → *Git branching (stacked task branches)*.
+
 ---
 
 ### Task 3.4: Error Handling & User Feedback
