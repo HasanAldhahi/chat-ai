@@ -1,0 +1,156 @@
+Bootstrap: localimage
+From: ../base/base.sif
+Stage: build
+
+# ---------------------------------------------------------------------------
+# chat-ai MCP server image (Task 2.2, feature 001-agentic-layer).
+#
+# Bootstraps from the base image (Task 2.1) and adds the MCP server
+# (`agentic/mcp_server/` Python package) plus its single non-stdlib
+# runtime dependency (pyflakes, for code_check). The base already ships
+# python3.11, fastapi, uvicorn, httpx — installed at base build time
+# from agentic/requirements.txt.
+#
+# What this image runs:
+#   uvicorn mcp_server.main:app --host 0.0.0.0 --port 8080
+#
+# That serves:
+#   GET  /health         liveness probe
+#   POST /rpc            JSON-RPC 2.0 (list_tools, call_tool)
+#
+# Tools exposed: fs_read, fs_write, fs_list, web_search, web_browse,
+# code_exec, code_check (see mcp_server/README.md for boundaries).
+#
+# Trust model: the server is unauthenticated by design — it binds to
+# localhost-equivalent inside the per-session container, and the agent
+# framework is the only client. The auth boundary is the broker
+# (X-User middleware, Task 1.7), not this server.
+# ---------------------------------------------------------------------------
+
+%files
+    # The mcp_server package is the entire payload. Copied into /opt
+    # so it doesn't shadow anything under /usr/local.
+    ../../mcp_server /opt/agentic/mcp_server
+    ../../requirements.txt /opt/agentic/requirements.txt
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Re-assert PATH so `python3.11` resolves consistently in this
+    # %post — the localimage bootstrap doesn't auto-source the parent's
+    # %environment.
+    export PATH=/usr/local/bin:/usr/bin:/bin
+
+    # ----- 1. Python deps --------------------------------------------------
+    # The base ships fastapi + uvicorn + httpx already (broker uses them).
+    # Re-installing from requirements.txt is idempotent and pins the same
+    # versions both layers see. pyflakes is the one new dep (code_check).
+    cd /opt/agentic
+    python3.11 -m pip install --no-cache-dir -r requirements.txt
+    python3.11 -m pip install --no-cache-dir pyflakes==3.2.0
+
+    # ----- 2. Sanity check the imports happen before the image is sealed.
+    python3.11 -c "import mcp_server.main; import mcp_server.tools" \
+        || { echo "mcp_server import failed"; exit 1; }
+    python3.11 -m pyflakes --version || true
+
+    # ----- 3. Build metadata (overwrite base's stamp with this image's) ---
+    : "${BUILD_SHA:=unknown}"
+    : "${BUILD_DATE:=unknown}"
+    cat > /etc/chat-ai-image-info <<EOF
+image=mcp
+task=2.2
+version=0.1.0
+git_sha=${BUILD_SHA}
+build_date=${BUILD_DATE}
+parent=base
+python=3.11
+mcp_port=8080
+EOF
+
+%environment
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PATH=/usr/local/bin:/usr/bin:/bin
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONUNBUFFERED=1
+    # Make /opt/agentic importable so `python3.11 -m mcp_server.*` works
+    # regardless of cwd. The agent's MCP client targets the HTTP endpoint
+    # so this is a defence-in-depth, not the primary entry point.
+    export PYTHONPATH=/opt/agentic:${PYTHONPATH:-}
+    export MCP_SERVER_PORT=${MCP_SERVER_PORT:-8080}
+    # Proxy is intentionally NOT hardcoded — broker plumbs per-session.
+
+%runscript
+    #!/bin/sh
+    if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+        cat <<EOF
+chat-ai MCP server image (Task 2.2)
+
+Default invocation starts uvicorn on \${MCP_SERVER_PORT:-8080}.
+Pass any other args to override and run an arbitrary command.
+
+Examples:
+  apptainer run mcp.sif                          # uvicorn on :8080
+  apptainer run mcp.sif python3.11 -V            # arbitrary command
+  apptainer exec mcp.sif curl -s :8080/health    # liveness probe
+
+Configure with MCP_SERVER_* env vars (see mcp_server/README.md).
+EOF
+        exit 0
+    fi
+
+    if [ "$#" -gt 0 ]; then
+        exec "$@"
+    fi
+
+    cd /opt/agentic
+    exec python3.11 -m uvicorn mcp_server.main:app \
+        --host 0.0.0.0 \
+        --port "${MCP_SERVER_PORT:-8080}"
+
+%startscript
+    # `apptainer instance start` entry point — same as runscript.
+    cd /opt/agentic
+    exec python3.11 -m uvicorn mcp_server.main:app \
+        --host 0.0.0.0 \
+        --port "${MCP_SERVER_PORT:-8080}"
+
+%labels
+    org.chat-ai.image mcp
+    org.chat-ai.task 2.2
+    org.chat-ai.version 0.1.0
+    org.chat-ai.parent base
+    org.chat-ai.python 3.11
+    org.chat-ai.mcp_port 8080
+    org.opencontainers.image.title chat-ai-mcp-server
+    org.opencontainers.image.description JSON-RPC 2.0 MCP server (fs/web/code tools) for chat-ai agents
+    org.opencontainers.image.source https://github.com/gwdg/chat-ai
+
+%help
+    chat-ai MCP server image (Task 2.2).
+
+    Bootstraps from ../base/base.sif (Task 2.1). Runs the
+    mcp_server FastAPI app on port 8080:
+        GET  /health        liveness probe
+        POST /rpc           JSON-RPC 2.0 (list_tools, call_tool)
+
+    Seven tools are exposed: fs_read, fs_write, fs_list, web_search,
+    web_browse, code_exec, code_check. See mcp_server/README.md for
+    boundaries (allowed paths, size caps, timeouts).
+
+    BUILD (after building base.sif first)
+        cd ../base && ./build_image.sh --fakeroot
+        cd ../mcp  && ./build_image.sh --fakeroot
+
+    RUN
+        apptainer run mcp.sif                  # uvicorn :8080
+        apptainer instance start mcp.sif mcp   # background instance
+        curl localhost:8080/health
+
+    VALIDATE
+        ./test_image.sh ./mcp.sif
+
+    The MCP server is unauthenticated by design — bind it only inside
+    the per-session container; the broker is the auth boundary.

@@ -21,6 +21,13 @@ This package currently implements:
 - **Task 1.7**: X-User Auth Middleware (`<user>@<tenant>` format
   validation, 30-min session idle timeout, per-user 10 req/s sliding-
   window rate limit, cross-user 403 for SSE sessions and Slurm jobs)
+- **Task 2.1**: Base Apptainer Image (Ubuntu 22.04 + Python 3.11 + Node 20 +
+  Chrome stable; recipe + build/test scripts + 51 structural pytest tests;
+  `.sif` build deferred to operator)
+- **Task 2.2**: MCP Server (`agentic/mcp_server/` — JSON-RPC 2.0 over
+  HTTP, seven tools: `fs_read`/`fs_write`/`fs_list`/`web_search`/
+  `web_browse`/`code_exec`/`code_check`; derived Apptainer image at
+  `agentic/containers/mcp/`; functional + structural pytest)
 
 ## Layout
 
@@ -50,6 +57,16 @@ agentic/
 │       ├── jobs.py         # POST/GET/DELETE /api/jobs…
 │       ├── secrets.py      # GET /api/secrets/{secret_type}
 │       └── sse.py          # GET /api/sse/{session_id}, POST …/events
+├── mcp_server/             # Task 2.2 — MCP server (separate FastAPI app)
+│   ├── main.py             #   FastAPI factory: GET /health, POST /rpc
+│   ├── server.py           #   JSON-RPC 2.0 dispatcher
+│   ├── config.py           #   MCP_SERVER_* settings (paths, sizes, timeouts)
+│   ├── errors.py           #   ToolError + JSON-RPC error codes
+│   ├── security.py         #   Path containment + URL/IP filter
+│   └── tools/              #   fs.py, web.py, code.py + registry
+├── containers/             # Apptainer recipes for per-session runtimes
+│   ├── base/               #   Task 2.1 (Ubuntu 22.04 + Python 3.11 + Node 20 + Chrome)
+│   └── mcp/                #   Task 2.2 (derived from base, runs mcp_server)
 ├── tests/
 │   ├── test_health.py
 │   ├── test_jobs.py
@@ -439,8 +456,8 @@ The test suite covers Tasks 1.1, 1.2, and 1.3 acceptance criteria:
 | 1.6 SSE Streaming | done (broadcast, heartbeat, 100 msg/s rate limit, idle reaper) |
 | 1.7 X-User Auth Middleware | done (format validation, session idle TTL, 10 req/s sliding-window, cross-user 403) |
 | 2.1 Base Apptainer Image | done (recipe + build script + structural tests; .sif build deferred to operator) |
-| 2.2 MCP Server Implementation | next |
-| 2.3 OpenHands Agent Packaging | todo |
+| 2.2 MCP Server Implementation | done (JSON-RPC server, 7 tools — fs/web/code, derived Apptainer image, structural + functional tests) |
+| 2.3 OpenHands Agent Packaging | next |
 | 2.4 Inner Sandbox (nsjail/bubblewrap) | todo |
 | 2.5 Network Filtering | todo |
 | 2.6 vLLM Integration | todo |

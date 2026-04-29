@@ -19,7 +19,7 @@ broker (FastAPI)
 | Subdir | Task | Purpose | Status |
 |---|---|---|---|
 | [`base/`](base/)        | 2.1 | Foundation image (Python 3.11, Node 20, Chrome, tooling) | done |
-| `mcp/`                  | 2.2 | MCP server (fs, web, code-exec tools) on top of base | TBD |
+| [`mcp/`](mcp/)          | 2.2 | MCP server (fs, web, code tools) on top of base | done |
 | `openhands/`            | 2.3 | OpenHands V1 agent + MCP client | TBD |
 | `sandbox/`              | 2.4 | nsjail / bubblewrap inner sandbox configuration | TBD |
 | `goose/`                | 4.1 | Goose agent framework | TBD |
