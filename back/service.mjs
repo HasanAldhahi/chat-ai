@@ -9,6 +9,11 @@ import fs from "fs";
 import path from "path";
 import { Readable } from "stream"; // Node's stream module
 import OpenAI from "openai";
+import {
+  registerAgenticRoutes,
+  isAgentModelRequestBody,
+  proxyAgentChatPost,
+} from "./agentic-routes.mjs";
 
 const app = express();
 
@@ -46,12 +51,6 @@ const agenticBrokerUrl = (process.env.AGENTIC_BROKER_URL || "http://127.0.0.1:80
   "",
 );
 
-function mapAgenticStatus(status) {
-  if (status === 400 || status === 401 || status === 403 || status === 422) return status;
-  if (status === 502 || status === 503) return 500;
-  return status >= 400 ? status : 200;
-}
-
 // Global request limitations
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ extended: true, limit: "50mb" }));
@@ -77,6 +76,8 @@ app.use((err, req, res, next) => {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
+
+registerAgenticRoutes(app, { brokerUrl: agenticBrokerUrl, fetchImpl: fetch });
 
 // Function to process file with docling
 async function processFile(file, inference_id) {
@@ -172,6 +173,13 @@ app.get("/user", async (req, res) => {
 
 // Chat Completions API
 app.post("/chat/completions", async (req, res) => {
+  if (isAgentModelRequestBody(req.body)) {
+    return proxyAgentChatPost(req, res, {
+      brokerUrl: agenticBrokerUrl,
+      fetchImpl: fetch,
+    });
+  }
+
   const {
     messages,
     model,
@@ -368,113 +376,6 @@ app.post("/chat/completions", async (req, res) => {
       console.error(err);
       return;
     }
-  }
-});
-
-/** Agent chat → FastAPI broker `/api/agent/chat` (OpenAI-style SSE or JSON). */
-app.post("/api/chat/agent", async (req, res) => {
-  const xUser =
-    req.headers["x-user"] ||
-    req.headers["X-User"] ||
-    process.env.AGENTIC_DEFAULT_X_USER ||
-    "";
-  if (!xUser) {
-    return res.status(401).json({
-      error: "X-User header required for agent chat (or set AGENTIC_DEFAULT_X_USER for dev)",
-    });
-  }
-  const url = `${agenticBrokerUrl}/api/agent/chat`;
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User": xUser,
-        ...(req.headers.authorization
-          ? { Authorization: req.headers.authorization }
-          : {}),
-      },
-      body: JSON.stringify(req.body),
-    });
-
-    const ct = (response.headers.get("content-type") || "").toLowerCase();
-
-    if (!response.ok) {
-      let payload = {};
-      try {
-        payload = await response.json();
-      } catch {
-        /* ignore */
-      }
-      const detail = payload.detail;
-      const errMsg =
-        typeof detail === "string"
-          ? detail
-          : Array.isArray(detail)
-            ? JSON.stringify(detail)
-            : payload.message || response.statusText || "agent chat error";
-      return res.status(mapAgenticStatus(response.status)).json({ error: errMsg });
-    }
-
-    if (ct.includes("text/event-stream") && response.body) {
-      res.status(200);
-      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-      res.setHeader("Cache-Control", "no-cache, no-transform");
-      res.setHeader("X-Accel-Buffering", "no");
-      response.body.pipe(res);
-      return;
-    }
-
-    const json = await response.json();
-    return res.status(200).json(json);
-  } catch (err) {
-    console.error("POST /api/chat/agent proxy error:", err);
-    return res.status(503).json({ error: "agentic broker unavailable" });
-  }
-});
-
-/** Proxy broker SSE: `GET /api/sse/{session_id}` (Task 3.1). */
-app.get("/api/chat/agent/sse", async (req, res) => {
-  const sessionId = req.query.session_id;
-  if (!sessionId || typeof sessionId !== "string") {
-    return res.status(422).json({ error: "query session_id is required" });
-  }
-  const xUser =
-    req.headers["x-user"] ||
-    req.headers["X-User"] ||
-    process.env.AGENTIC_DEFAULT_X_USER ||
-    "";
-  if (!xUser) {
-    return res.status(401).json({ error: "X-User header required" });
-  }
-  const url = `${agenticBrokerUrl}/api/sse/${encodeURIComponent(sessionId)}`;
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "X-User": xUser,
-        Accept: "text/event-stream",
-        ...(req.headers.authorization
-          ? { Authorization: req.headers.authorization }
-          : {}),
-      },
-    });
-    if (!response.ok) {
-      return res
-        .status(mapAgenticStatus(response.status))
-        .json({ error: await response.text() });
-    }
-    res.status(200);
-    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("X-Accel-Buffering", "no");
-    if (response.body) {
-      response.body.pipe(res);
-    } else {
-      res.end();
-    }
-  } catch (err) {
-    console.error("GET /api/chat/agent/sse proxy error:", err);
-    return res.status(503).json({ error: "agentic broker unavailable" });
   }
 });
 
