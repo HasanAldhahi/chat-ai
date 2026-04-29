@@ -3,6 +3,103 @@ import OpenAI from "openai";
 // Controller for handling API request cancellation
 let controller = new AbortController();
 
+function brokerMessages(messages) {
+  return messages.map((m) => {
+    let c = m.content;
+    if (Array.isArray(c)) {
+      c = c
+        .filter((x) => x.type === "text")
+        .map((x) => x.text || "")
+        .join("\n");
+    }
+    return { role: m.role, content: c || "" };
+  });
+}
+
+/**
+ * Agent models: Node `/api/chat/agent` → FastAPI → vLLM (Tasks 3.1 + 2.6).
+ */
+async function* agentChatCompletions(conversation, timeout = 30000) {
+  let baseURL = import.meta.env.VITE_BACKEND_ENDPOINT;
+  try {
+    baseURL = new URL(baseURL).toString();
+  } catch {
+    baseURL = new URL(baseURL, window.location.origin).toString();
+  }
+  const agentUrl = new URL("api/chat/agent", baseURL).toString();
+  const model =
+    typeof conversation.settings.model === "string"
+      ? conversation.settings.model
+      : conversation.settings.model?.name ||
+        conversation.settings.model?.id ||
+        "";
+
+  const body = {
+    model,
+    messages: brokerMessages(conversation.messages || []),
+    session_id: conversation.id || "",
+    stream: true,
+    temperature: conversation.settings.temperature ?? 0.5,
+    top_p: conversation.settings.top_p ?? 0.5,
+  };
+
+  const xUser =
+    import.meta.env.VITE_AGENTIC_X_USER ||
+    import.meta.env.VITE_X_USER ||
+    "dev@gwdg";
+
+  const res = await fetch(agentUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-User": xUser,
+    },
+    body: JSON.stringify(body),
+    signal: controller.signal,
+  });
+
+  if (!res.ok) {
+    let errObj = {};
+    try {
+      errObj = await res.json();
+    } catch {
+      /* ignore */
+    }
+    const e = new Error(errObj.error || res.statusText || "Agent chat failed");
+    e.status = res.status;
+    throw e;
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) {
+    return;
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      for (const line of block.split("\n")) {
+        const t = line.trim();
+        if (!t.startsWith("data:")) continue;
+        const payload = t.slice(5).trim();
+        if (payload === "[DONE]") continue;
+        try {
+          const chunk = JSON.parse(payload);
+          yield chunk;
+        } catch {
+          /* skip malformed */
+        }
+      }
+    }
+  }
+}
+
 async function* chatCompletions (
   conversation,
   timeout = 30000,
@@ -12,6 +109,18 @@ async function* chatCompletions (
     const model = typeof conversation.settings.model === 'string'
       ? conversation.settings.model
       : conversation.settings.model?.id; // TODO fall back to defaultModel
+
+    const modelLabel =
+      typeof conversation.settings.model === "string"
+        ? conversation.settings.model
+        : conversation.settings.model?.name ||
+          conversation.settings.model?.id ||
+          "";
+
+    if (String(modelLabel).toLowerCase().includes("agent")) {
+      yield* agentChatCompletions(conversation, timeout);
+      return;
+    }
 
     // Define base URL from config
     let baseURL = import.meta.env.VITE_BACKEND_ENDPOINT;

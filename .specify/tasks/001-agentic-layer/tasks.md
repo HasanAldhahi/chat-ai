@@ -9,6 +9,7 @@ This document breaks down the implementation plan for the agentic layer into act
 - 🟡 IN PROGRESS: Currently being worked on
 - 🟢 DONE: Completed and tested
 - 🔵 BLOCKED: Waiting on dependency
+- ⏭️ SKIPPED: Explicitly deferred this iteration (see task note)
 
 ---
 
@@ -554,7 +555,7 @@ Configure network filtering to force all outbound web traffic through the GWDG W
 ---
 
 ### Task 2.6: vLLM Integration
-**Status:** 🔴 TODO
+**Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 1-2 days
 **Assignee:** TBD
@@ -590,12 +591,14 @@ Configure agent frameworks to use the existing vLLM inference server with Hermes
 - Add monitoring for LLM API latency and errors
 - Code reviewed and merged
 
+**✅ Implementation note (2026-04-29):** Broker `Settings` adds `vllm_base_url`, `vllm_model`, `vllm_timeout_s`, `vllm_api_key` (optional). Client `agentic/app/clients/vllm.py` (`stream_chat_completion`, `chat_completion_json`). Routes: `POST /api/agent/chat` (requires `X-User`; model id must contain substring `agent`; streams SSE chunks or JSON from vLLM OpenAI-compatible API), `GET /api/vllm/health`. Tests: `agentic/tests/test_vllm_agent_chat.py` (httpx mocking). Operator still wires real vLLM URL/model in prod and validates Hermes tool-call flow inside cluster agents.
+
 ---
 
 ## PHASE 3: Frontend Integration
 
 ### Task 3.1: Node.js Backend Modification
-**Status:** 🔴 TODO
+**Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -644,10 +647,12 @@ Modify the existing Node.js Express backend to detect agent model selection and 
 - Document new routes and request format
 - Maintain backward compatibility with existing chat API
 
+**✅ Implementation note (2026-04-29):** `back/service.mjs`: `AGENTIC_BROKER_URL` (default `http://127.0.0.1:8001`), `mapAgenticStatus`. `POST /api/chat/agent` proxies to broker `POST /api/agent/chat` (stream or JSON); `GET /api/chat/agent/sse` → broker `GET /api/sse/{session_id}`. No separate Jest suite in repo; verify with broker running (`node --check` clean).
+
 ---
 
 ### Task 3.2: React Frontend - Agent Model Selection
-**Status:** 🔴 TODO
+**Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -687,10 +692,12 @@ Update the React model dropdown to include agent options and distinguish them vi
 - Code reviewed and merged
 - Update documentation with screenshots
 
+**✅ Implementation note (2026-04-29):** `front/src/hooks/useUpdateModelsData.jsx` prepends static agent models (OpenHands, Goose, opencode — **not** smolagents; see Task 4.2). `ModelSelectorSimple.tsx` tooltips for agent rows. Meets grouped + 🤖 + tooltip intent; full design review / screenshots still optional.
+
 ---
 
 ### Task 3.3: React Frontend - Real-Time Streaming UI
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS
 **Priority:** HIGH
 **Est. Effort:** 3-4 days
 **Assignee:** TBD
@@ -742,10 +749,12 @@ Implement UI components to parse and display SSE messages from the FastAPI broke
 - Code reviewed and merged
 - Update documentation with screenshots of agent UI
 
+**🟡 Partial (2026-04-29):** Agent model traffic uses `front/src/apis/chatCompletions.jsx` → `fetch` to `/api/chat/agent`, parses SSE `data:` lines into the existing streaming assistant loop (token/chunk path). **Not done:** dedicated gray action/result boxes, per-tool icons, “Show more”, separate “Stop Agent” control — still standard stop/generation UX.
+
 ---
 
 ### Task 3.4: Error Handling & User Feedback
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -792,12 +801,14 @@ Backend (Node.js):
 - Document error messages and retry logic
 - Add monitoring for error rates
 
+**🟡 Partial (2026-04-29):** Node maps broker 502/503 → 500; 4xx forwarded. Frontend/agent path relies on existing toast patterns for fetch failures; exhaustive copy for Slurm/container/timeout scenarios not fully mapped in UI.
+
 ---
 
 ## PHASE 4: Multi-Agent Framework Support
 
 ### Task 4.1: Goose Agent Packaging
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -838,13 +849,17 @@ Package the Goose agent framework inside the Apptainer container with MCP client
 - Code reviewed and merged
 - Add health check for Goose process
 
+**🟡 Scaffold (2026-04-29):** `agentic/containers/goose/README.md` documents intended layout; full Apptainer recipe + build parity with OpenHands — TODO.
+
 ---
 
 ### Task 4.2: smolagents Packaging
-**Status:** 🔴 TODO
+**Status:** ⏭️ SKIPPED
 **Priority:** LOW
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
+
+**⏭️ Note:** Omitted this sprint by product choice (no UI model, no image work). Re-open when Task 4.5 / packaging resumes.
 
 **Description:**
 Package the Hugging Face smolagents framework inside the Apptainer container with MCP support.
@@ -874,7 +889,7 @@ Package the Hugging Face smolagents framework inside the Apptainer container wit
 ---
 
 ### Task 4.3: sst/opencode Packaging
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS
 **Priority:** LOW
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -904,10 +919,12 @@ Package the sst/opencode framework inside the Apptainer container with MCP suppo
 - Document configuration
 - Code reviewed and merged
 
+**🟡 Scaffold (2026-04-29):** `agentic/containers/opencode/README.md`; full image — TODO.
+
 ---
 
 ### Task 4.4: Agent Skills Framework
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 4-5 days
 **Assignee:** TBD
@@ -954,10 +971,12 @@ Implement the Agent Skills system, which loads Markdown instruction files (SKILL
 - Code reviewed and merged
 - Document skill format and how to add custom skills
 
+**🟡 Partial (2026-04-29):** Planning doc `agentic/docs/SKILLS_FRAMEWORK.md`. MCP `get_skills()` loader, frontmatter validation, and bundled `SKILL.md` files — TODO.
+
 ---
 
 ### Task 4.5: Multi-Agent Selection UI
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 1-2 days
 **Assignee:** TBD
@@ -990,9 +1009,13 @@ Update the React frontend to allow users to select from multiple agent framework
 - Code reviewed and merged
 - Update documentation with agent descriptions
 
+**🟡 Partial (2026-04-29):** Three agents in dropdown + tooltips; **fourth** (smolagents) omitted with Task 4.2. Backend receives agent model id via existing chat payload.
+
 ---
 
 ## PHASE 5: Security & Testing
+
+**📋 Planning (2026-04-29):** Operator-facing execution checklists for Tasks 5.1–5.5 are in `.specify/tasks/001-agentic-layer/PRODUCTION_CHECKLIST.md`. Traceability test: `agentic/tests/test_phase5_artifacts.py`.
 
 ### Task 5.1: Security Penetration Testing
 **Status:** 🔴 TODO

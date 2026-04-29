@@ -127,9 +127,10 @@ async def code_check(args: Dict[str, Any]) -> Dict[str, Any]:
 
     proc = await asyncio.create_subprocess_exec(
         s.code_python_bin,
-        "-I",
         "-m",
         "pyflakes",
+        # Do not pass ``-I`` here: isolated mode drops user/venv site-packages
+        # so ``python -m pyflakes`` often fails to import pyflakes in dev images.
         # pyflakes reads stdin when no path args are given — `-` is
         # interpreted as a literal filename.
         stdin=asyncio.subprocess.PIPE,

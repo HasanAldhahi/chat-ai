@@ -14,7 +14,7 @@ from app import __version__
 from app.config import Settings, get_settings
 from app.logging_config import configure_logging
 from app.middleware.auth import AuthMiddleware
-from app.routers import health, jobs, secrets, sse
+from app.routers import agent_chat, health, jobs, secrets, sse
 from app.services.auth import AuthService
 
 
@@ -102,6 +102,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(secrets.router)
     app.include_router(sse.router)
+    app.include_router(agent_chat.router)
     return app
 
 

@@ -81,11 +81,20 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
         className={`item cursor-pointer my-1 px-2 py-1 hover:bg-slate-100 rounded-2xl border bg-white dark:bg-bg_secondary_dark ${selected ? "border-blue-500" : "border-slate-200 dark:border-gray-500"}`}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             <div className="pl-1">
               <DemandIndicator demand={model.demand} status={model?.status} />
             </div>
-            <span className="font-medium">{model.name}</span>
+            <span
+              className="font-medium"
+              title={
+                String(model.name || model.id).includes("Agent")
+                  ? "Agents can use tools (web, files, code)"
+                  : undefined
+              }
+            >
+              {model.name}
+            </span>
           </div>
           <div className="ml-2 flex items-center gap-1 text-tertiary">
             {model.input?.includes("image") && <Tooltip text={"Image Input"}><FontAwesomeIcon icon={faImage} /></Tooltip>}

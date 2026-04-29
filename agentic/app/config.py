@@ -84,6 +84,29 @@ class Settings(BaseSettings):
         description="NO_PROXY for agent jobs — loopback MCP + vLLM hostname.",
     )
 
+    # --- vLLM / OpenAI-compatible inference (Task 2.6) ---------------------
+    vllm_base_url: str = Field(
+        default="",
+        description="Base URL only, e.g. http://vllm-service.cluster:8000",
+    )
+    vllm_chat_path: str = Field(
+        default="/v1/chat/completions",
+        description="Path appended to vllm_base_url for chat completions.",
+    )
+    vllm_model: str = Field(
+        default="qwen3-30b",
+        description="Model id as registered on the vLLM server.",
+    )
+    vllm_api_key: str = Field(
+        default="",
+        description="Optional Bearer token for vLLM HTTP API.",
+    )
+    vllm_request_timeout_s: float = Field(
+        default=120.0,
+        gt=0,
+        description="Upstream timeout for vLLM chat requests.",
+    )
+
     # --- Vault ---------------------------------------------------------------
     vault_base_url: str = Field(
         default="http://localhost:8200",
@@ -194,6 +217,7 @@ class Settings(BaseSettings):
             "/docs",
             "/redoc",
             "/docs/oauth2-redirect",
+            "/api/vllm/health",
         ],
         description="HTTP paths the middleware should ignore "
         "(infrastructure / docs).",
