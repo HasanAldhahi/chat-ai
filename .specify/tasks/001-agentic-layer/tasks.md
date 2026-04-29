@@ -604,7 +604,7 @@ Configure agent frameworks to use the existing vLLM inference server with Hermes
 - Add monitoring for LLM API latency and errors
 - Code reviewed and merged
 
-**✅ Implementation note (2026-04-29):** Broker `Settings` adds `vllm_base_url`, `vllm_model`, `vllm_timeout_s`, `vllm_api_key` (optional). Client `agentic/app/clients/vllm.py` (`stream_chat_completion`, `chat_completion_json`). Routes: `POST /api/agent/chat` (requires `X-User`; model id must contain substring `agent`; streams SSE chunks or JSON from vLLM OpenAI-compatible API), `GET /api/vllm/health`. Tests: `agentic/tests/test_vllm_agent_chat.py` (httpx mocking). Operator still wires real vLLM URL/model in prod and validates Hermes tool-call flow inside cluster agents.
+**✅ Implementation note (2026-04-29):** **Branch:** `task-2.6-vllm-integration` — created from `task-2.5-network-filtering` (`fa1d5b2`); tip **`2ed5263`** (vLLM + broker agent chat + `code_check` pyflakes fix). Use `git diff fa1d5b2..task-2.6-vllm-integration` for an isolated 2.6 delta. Broker `Settings` adds `vllm_base_url`, `vllm_model`, `vllm_timeout_s`, `vllm_api_key` (optional). Client `agentic/app/clients/vllm.py` (`stream_chat_completion`, `chat_completion_json`). Routes: `POST /api/agent/chat` (requires `X-User`; model id must contain substring `agent`; streams SSE chunks or JSON from vLLM OpenAI-compatible API), `GET /api/vllm/health`. Tests: `agentic/tests/test_vllm_agent_chat.py` (httpx mocking). Operator still wires real vLLM URL/model in prod and validates Hermes tool-call flow inside cluster agents.
 
 ---
 
