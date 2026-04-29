@@ -647,7 +647,7 @@ Modify the existing Node.js Express backend to detect agent model selection and 
 - Document new routes and request format
 - Maintain backward compatibility with existing chat API
 
-**✅ Implementation note (2026-04-29):** `back/service.mjs`: `AGENTIC_BROKER_URL` (default `http://127.0.0.1:8001`), `mapAgenticStatus`. `POST /api/chat/agent` proxies to broker `POST /api/agent/chat` (stream or JSON); `GET /api/chat/agent/sse` → broker `GET /api/sse/{session_id}`. No separate Jest suite in repo; verify with broker running (`node --check` clean).
+**✅ Implementation note (2026-04-29):** `back/agentic-routes.mjs` — `mapAgenticStatus`, `isAgentModelRequestBody`, `normalizeAgentChatPayload`, `registerAgenticRoutes`, `proxyAgentChatPost`, `proxyAgentSseGet`. `back/service.mjs`: `AGENTIC_BROKER_URL`, registers routes **after** body parsers; **`POST /chat/completions`** auto-forwards to the broker when `model` contains `"agent"` (same payload as `/api/chat/agent`). **`npm test`** in `back/` runs `node --test ./test/*.mjs` (helpers + mock-broker integration, SSE + status mapping). Optional: run against real broker with `AGENTIC_BROKER_URL` + `pytest` agentic suite in CI.
 
 ---
 
