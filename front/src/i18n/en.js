@@ -284,6 +284,9 @@ export default {
   model_selector: {
     docs_hint_text: "Need help deciding which model fits best?",
     docs_hint_link: "Read the model overview.",
+    agents_group: "Agents",
+    chat_models_group: "Chat models",
+    agent_tooltip: "Agents can use tools (web, files, code)",
   },
   // Tour
   tour: {

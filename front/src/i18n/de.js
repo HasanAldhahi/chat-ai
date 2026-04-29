@@ -283,6 +283,9 @@ export default {
   model_selector: {
     docs_hint_text: "Unsicher, welches Modell Sie wählen sollen?",
     docs_hint_link: "Lesen Sie die Modellübersicht.",
+    agents_group: "Agenten",
+    chat_models_group: "Chat-Modelle",
+    agent_tooltip: "Agenten können Werkzeuge nutzen (Web, Dateien, Code)",
   },
   // Tour
   tour: {
