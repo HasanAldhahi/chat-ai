@@ -28,6 +28,11 @@ This package currently implements:
   HTTP, seven tools: `fs_read`/`fs_write`/`fs_list`/`web_search`/
   `web_browse`/`code_exec`/`code_check`; derived Apptainer image at
   `agentic/containers/mcp/`; functional + structural pytest)
+- **Task 2.3**: OpenHands packaging (`agentic/openhands_runtime/` — launcher,
+  SSE forwarder to the broker, config; derived Apptainer image at
+  `agentic/containers/openhands/` bootstrapping from `mcp.sif`; structural +
+  runtime pytest; full OpenHands→MCP smoke via `containers/openhands/test_image.sh`
+  on a build host)
 
 ## Layout
 
@@ -64,9 +69,15 @@ agentic/
 │   ├── errors.py           #   ToolError + JSON-RPC error codes
 │   ├── security.py         #   Path containment + URL/IP filter
 │   └── tools/              #   fs.py, web.py, code.py + registry
+├── openhands_runtime/      # Task 2.3 — in-container launcher + SSE bridge
+│   ├── config.py           #   OPENHANDS_* / broker URL settings
+│   ├── launcher.py         #   MCP uvicorn → health → OpenHands → forwarder
+│   ├── sse_forwarder.py    #   OpenHands stdout → POST …/events
+│   └── openhands_config.toml  #   Shipped as /etc/openhands/config.toml in image
 ├── containers/             # Apptainer recipes for per-session runtimes
 │   ├── base/               #   Task 2.1 (Ubuntu 22.04 + Python 3.11 + Node 20 + Chrome)
-│   └── mcp/                #   Task 2.2 (derived from base, runs mcp_server)
+│   ├── mcp/                #   Task 2.2 (derived from base, runs mcp_server)
+│   └── openhands/          #   Task 2.3 (derived from mcp, OpenHands V1 + launcher)
 ├── tests/
 │   ├── test_health.py
 │   ├── test_jobs.py
@@ -457,7 +468,7 @@ The test suite covers Tasks 1.1, 1.2, and 1.3 acceptance criteria:
 | 1.7 X-User Auth Middleware | done (format validation, session idle TTL, 10 req/s sliding-window, cross-user 403) |
 | 2.1 Base Apptainer Image | done (recipe + build script + structural tests; .sif build deferred to operator) |
 | 2.2 MCP Server Implementation | done (JSON-RPC server, 7 tools — fs/web/code, derived Apptainer image, structural + functional tests) |
-| 2.3 OpenHands Agent Packaging | next |
+| 2.3 OpenHands Agent Packaging | done (openhands_runtime + openhands.sif recipe, launcher/SSE tests; operator smoke: test_image.sh) |
 | 2.4 Inner Sandbox (nsjail/bubblewrap) | todo |
 | 2.5 Network Filtering | todo |
 | 2.6 vLLM Integration | todo |
@@ -466,15 +477,16 @@ The test suite covers Tasks 1.1, 1.2, and 1.3 acceptance criteria:
 
 The Apptainer recipes for the per-session agent runtimes live under
 [`containers/`](containers/). Each agent framework (OpenHands, Goose,
-…) is a derived image that bootstraps from
-[`containers/base/base.sif`](containers/base/) (Task 2.1, ✅) via
-`Bootstrap: localimage`. The base ships Python 3.11, Node 20, Google
+…) is a derived image. **OpenHands** (Task 2.3) bootstraps from
+[`containers/mcp/mcp.sif`](containers/mcp/) (Task 2.2); **MCP** and other
+stacks bootstrap from [`containers/base/base.sif`](containers/base/) (Task 2.1)
+via `Bootstrap: localimage`. The base ships Python 3.11, Node 20, Google
 Chrome stable, and the headless-browser runtime libs.
 
 The build is deferred to whoever has cluster / build-host access (the
-dev VM has no `apptainer` binary). The **recipe** is tested here via
-`tests/test_apptainer_base.py` (static parsing — required sections,
-package set, mount-point setup, `%runscript --help` exit 0, no proxy
-hardcode). The **built image** is tested by
-`containers/base/test_image.sh`, which the cluster operator runs on a
-host with apptainer + the resulting `.sif`.
+dev VM has no `apptainer` binary). The **recipes** are tested here via
+`tests/test_apptainer_base.py`, `test_apptainer_mcp.py`, and
+`test_apptainer_openhands.py` (static parsing — required sections, wiring,
+`%runscript --help` exit 0, no proxy hardcode). The **built images** are
+smoke-tested by `containers/*/test_image.sh` on a host with Apptainer
+and the prerequisite `.sif` chain (`base.sif` → `mcp.sif` → `openhands.sif`).

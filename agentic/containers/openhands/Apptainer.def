@@ -1,0 +1,173 @@
+Bootstrap: localimage
+From: ../mcp/mcp.sif
+Stage: build
+
+# ---------------------------------------------------------------------------
+# chat-ai OpenHands agent image (Task 2.3, feature 001-agentic-layer).
+#
+# Bootstraps from the MCP image (Task 2.2), which itself bootstraps from
+# the base (Task 2.1). Adds:
+#
+#   - OpenHands V1 (pinned via pip; verify against current upstream
+#     before rolling to production)
+#   - openhands_runtime/ Python package (launcher, sse_forwarder, config)
+#   - /etc/openhands/config.toml — OpenHands V1 TOML config template
+#
+# What this image runs (per %runscript / %startscript):
+#
+#   python3.11 -m openhands_runtime.launcher
+#
+# which in turn:
+#   1. Starts uvicorn mcp_server.main:app on ${MCP_SERVER_PORT:-8080}.
+#   2. Waits for /health (timeout 20 s).
+#   3. Spawns OpenHands with env that points it at the local MCP, vLLM,
+#      and the per-session HTTPS proxy.
+#   4. Tails OpenHands stdout, posting structured events to the broker's
+#      SSE endpoint.
+#
+# OpenHands runs WITHOUT Docker / Podman — the per-session Apptainer
+# container IS the sandbox (acceptance criterion). OpenHands' own
+# `local` runtime mode is selected in /etc/openhands/config.toml so it
+# never tries to spin up an inner container.
+# ---------------------------------------------------------------------------
+
+%files
+    # Python package + the OpenHands TOML template.
+    ../../openhands_runtime /opt/agentic/openhands_runtime
+    ../../openhands_runtime/openhands_config.toml /etc/openhands/config.toml
+    entrypoint.sh /opt/agentic/entrypoint.sh
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export PATH=/usr/local/bin:/usr/bin:/bin
+
+    # ----- 1. OpenHands V1 + adapter deps ----------------------------------
+    # NOTE on pinning: the OpenHands V1 PyPI release line moves quickly.
+    # `openhands-ai` is the published distribution name as of this commit;
+    # operators should `apptainer inspect --labels` after a build to
+    # confirm what landed.
+    python3.11 -m pip install --no-cache-dir \
+        "openhands-ai==0.13.0" \
+        "tomli==2.0.1"
+
+    # The launcher and SSE forwarder rely only on stdlib + httpx + pydantic
+    # which already came in via mcp_server's requirements.txt. Re-affirm
+    # the import graph so we fail at build time rather than at first run.
+    python3.11 -c "import openhands_runtime.launcher; import openhands_runtime.sse_forwarder" \
+        || { echo "openhands_runtime import failed"; exit 1; }
+
+    # ----- 2. Filesystem layout --------------------------------------------
+    chmod +x /opt/agentic/entrypoint.sh
+    mkdir -p /etc/openhands
+    test -f /etc/openhands/config.toml \
+        || { echo "openhands config.toml missing"; exit 1; }
+
+    # ----- 3. Build metadata (overwrite parent stamp with this image's) ---
+    : "${BUILD_SHA:=unknown}"
+    : "${BUILD_DATE:=unknown}"
+    cat > /etc/chat-ai-image-info <<EOF
+image=openhands
+task=2.3
+version=0.1.0
+git_sha=${BUILD_SHA}
+build_date=${BUILD_DATE}
+parent=mcp
+python=3.11
+mcp_port=8080
+EOF
+
+%environment
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PATH=/usr/local/bin:/usr/bin:/bin
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONUNBUFFERED=1
+    export PYTHONPATH=/opt/agentic:${PYTHONPATH:-}
+    export MCP_SERVER_PORT=${MCP_SERVER_PORT:-8080}
+    # Defaults for the launcher; broker overrides per-session via
+    # APPTAINERENV_OPENHANDS_*. Proxy is intentionally NOT hardcoded.
+    export OPENHANDS_MCP_SERVER_URL=${OPENHANDS_MCP_SERVER_URL:-http://localhost:8080}
+    export OPENHANDS_MCP_UVICORN_PORT=${OPENHANDS_MCP_UVICORN_PORT:-8080}
+    export OPENHANDS_OPENHANDS_CONFIG_PATH=${OPENHANDS_OPENHANDS_CONFIG_PATH:-/etc/openhands/config.toml}
+    export OPENHANDS_OPENHANDS_WORKSPACE=${OPENHANDS_OPENHANDS_WORKSPACE:-/workspace}
+
+%runscript
+    #!/bin/sh
+    if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+        cat <<EOF
+chat-ai OpenHands agent image (Task 2.3)
+
+Default invocation runs the per-session launcher:
+    python3.11 -m openhands_runtime.launcher
+
+Pass any other args to override and run an arbitrary command.
+
+Examples:
+  apptainer run openhands.sif                     # default launcher
+  apptainer run openhands.sif python3.11 -V       # arbitrary command
+  apptainer exec openhands.sif curl :8080/health  # liveness probe of MCP
+
+Configure via OPENHANDS_* / MCP_SERVER_* env vars (see
+openhands_runtime/README.md, mcp_server/README.md). Broker plumbs
+per-session values via APPTAINERENV_*.
+EOF
+        exit 0
+    fi
+
+    if [ "$#" -gt 0 ]; then
+        exec "$@"
+    fi
+
+    cd /opt/agentic
+    exec /opt/agentic/entrypoint.sh
+
+%startscript
+    cd /opt/agentic
+    exec /opt/agentic/entrypoint.sh
+
+%labels
+    org.chat-ai.image openhands
+    org.chat-ai.task 2.3
+    org.chat-ai.version 0.1.0
+    org.chat-ai.parent mcp
+    org.chat-ai.python 3.11
+    org.chat-ai.mcp_port 8080
+    org.chat-ai.framework openhands-v1
+    org.opencontainers.image.title chat-ai-openhands-agent
+    org.opencontainers.image.description OpenHands V1 agent + MCP client for chat-ai agents
+    org.opencontainers.image.source https://github.com/gwdg/chat-ai
+
+%help
+    chat-ai OpenHands agent image (Task 2.3).
+
+    Bootstraps from ../mcp/mcp.sif (Task 2.2), itself from
+    ../base/base.sif (Task 2.1). Runs the per-session launcher:
+
+        python3.11 -m openhands_runtime.launcher
+
+    The launcher boots MCP (uvicorn, port 8080), waits /health,
+    spawns OpenHands with the right env (MCP_SERVER_URL, LLM_*, proxy),
+    and forwards OpenHands stdout to the broker's SSE endpoint.
+
+    BUILD (after building base.sif and mcp.sif first)
+        cd ../base      && ./build_image.sh --fakeroot
+        cd ../mcp       && ./build_image.sh --fakeroot
+        cd ../openhands && ./build_image.sh --fakeroot
+
+    RUN
+        APPTAINERENV_OPENHANDS_SESSION_ID=sess-001 \
+        APPTAINERENV_OPENHANDS_USER_ID=alice@gwdg \
+        APPTAINERENV_OPENHANDS_BROKER_SSE_URL=http://broker:8001 \
+        APPTAINERENV_OPENHANDS_LLM_API_URL=http://vllm.cluster/v1/completions \
+        APPTAINERENV_HTTPS_PROXY=http://www-cache.gwdg.de:3128 \
+            apptainer run \
+                --bind $SLURM_TMPDIR:/workspace \
+                --bind $HOME:/home/user:ro \
+                openhands.sif
+
+    VALIDATE
+        ./test_image.sh ./openhands.sif
+
+    The OpenHands V1 pin (and MCP TOML schema) may need to track
+    upstream — see Apptainer.def %post for the version literal.

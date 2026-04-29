@@ -407,7 +407,7 @@ Implement Model Context Protocol (MCP) server inside the Apptainer container tha
 ---
 
 ### Task 2.3: OpenHands Agent Packaging
-**Status:** 🔴 TODO
+**Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 3-4 days
 **Assignee:** TBD
@@ -1257,9 +1257,9 @@ Prepare system for production launch by setting up monitoring, runbooks, documen
   - MEDIUM: 7
   - LOW: 4
 - **Tasks by Status:**
-  - 🔴 TODO: 22
+  - 🔴 TODO: 21
   - 🟡 IN PROGRESS: 0
-  - 🟢 DONE: 9
+  - 🟢 DONE: 10
   - 🔵 BLOCKED: 0
 - **Estimated Total Effort:** 100-135 person-days
 

@@ -20,7 +20,7 @@ broker (FastAPI)
 |---|---|---|---|
 | [`base/`](base/)        | 2.1 | Foundation image (Python 3.11, Node 20, Chrome, tooling) | done |
 | [`mcp/`](mcp/)          | 2.2 | MCP server (fs, web, code tools) on top of base | done |
-| `openhands/`            | 2.3 | OpenHands V1 agent + MCP client | TBD |
+| [`openhands/`](openhands/) | 2.3 | OpenHands V1 agent + MCP client | done |
 | `sandbox/`              | 2.4 | nsjail / bubblewrap inner sandbox configuration | TBD |
 | `goose/`                | 4.1 | Goose agent framework | TBD |
 | `smolagents/`           | 4.2 | Hugging Face smolagents | TBD |
@@ -60,15 +60,15 @@ Every recipe in this directory follows the same shape:
 
 ## Static testing
 
-The Python test suite under `agentic/tests/` includes
-`test_apptainer_base.py`, which parses `base/Apptainer.def` as text and
-asserts required sections / packages / mount-point setup are present.
-This catches regressions (deleted packages, accidental proxy hardcodes,
-stripped `--help` branch) without needing a build host.
+The Python test suite under `agentic/tests/` includes static recipe tests:
+`test_apptainer_base.py`, `test_apptainer_mcp.py`, and
+`test_apptainer_openhands.py`. Each parses the recipe and build scripts as
+text and asserts required sections / wiring are present. This catches
+regressions without needing a build host.
 
 ```bash
 cd agentic
-pytest -q tests/test_apptainer_base.py
+pytest -q tests/test_apptainer_base.py tests/test_apptainer_mcp.py tests/test_apptainer_openhands.py
 ```
 
 Future image directories should add a sibling `test_apptainer_<image>.py`

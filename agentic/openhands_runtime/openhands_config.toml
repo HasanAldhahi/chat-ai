@@ -1,0 +1,53 @@
+# OpenHands V1 configuration for the chat-ai agentic layer.
+#
+# Shipped as /etc/openhands/config.toml inside the Task 2.3
+# Apptainer image. The launcher (`python3.11 -m openhands_runtime.launcher`)
+# overlays per-session env vars on top — anything templated here as
+# ${VAR} is substituted by OpenHands itself at start-up from the
+# environment we pass in.
+#
+# WHY THIS SHAPE: OpenHands V1's TOML schema isn't fully
+# version-stable as of this commit. Treat the keys below as a
+# starting template; verify against the OpenHands version pinned
+# in the recipe's `%post` (see ../containers/openhands/Apptainer.def)
+# before rolling to production. The launcher does NOT parse this
+# file — OpenHands does — so a schema drift here will surface as
+# "OpenHands refuses to start" on the cluster, not a silent
+# misconfiguration.
+
+[runtime]
+# Use plain local execution; the per-session Apptainer container
+# IS the sandbox. Avoid OpenHands' own Docker / Podman runtime.
+type = "local"
+workspace = "${OPENHANDS_WORKSPACE}"
+
+[llm]
+# OpenAI-compatible vLLM endpoint, plumbed in by the broker.
+api_base = "${LLM_API_URL}"
+model = "${LLM_MODEL}"
+# Hermes-style tool call parsing, matched to the cluster's
+# `vllm serve --tool-call-parser hermes`. If the cluster swaps
+# parsers this must change to match.
+parser = "${LLM_PARSER}"
+# Prefer streamed completions so the SSE forwarder gets per-token
+# updates rather than one wall of text per turn.
+stream = true
+
+[tools]
+# Disable OpenHands' built-in tools — the MCP server is the single
+# source of truth for fs/web/code so we don't double-implement
+# (or worse, present two divergent versions to the agent).
+builtin_enabled = false
+
+[[mcp.servers]]
+name = "agentic-mcp"
+# In-container loopback to the MCP server the launcher started.
+url = "${MCP_SERVER_URL}"
+# JSON-RPC 2.0 over HTTP, single endpoint.
+transport = "http"
+endpoint = "/rpc"
+
+[telemetry]
+# Structured stdout — the launcher tails this and forwards each
+# line to the broker's SSE hub via translate_openhands_line().
+format = "jsonl"
