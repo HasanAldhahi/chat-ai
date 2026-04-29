@@ -164,12 +164,15 @@ local debug build.
 |---|---|---|
 | `../mcp/`        | 2.2 | MCP server inside the container (file system, web search, code exec tools) |
 | `../openhands/`  | 2.3 | OpenHands V1 agent + MCP client |
-| `../sandbox/`    | 2.4 | nsjail / bubblewrap inner sandbox for browser process |
+| `../sandbox/`    | 2.4 | bubblewrap Chrome wrapper **sources** (copied into base `%files`; no separate `.sif`) |
 | `../goose/`      | 4.1 | Goose agent framework |
 | `../smolagents/` | 4.2 | Hugging Face smolagents |
 | `../opencode/`   | 4.3 | sst/opencode |
 
-Each derived image starts with:
+Task 2.4 assets live under `../sandbox/` but ship **inside** this base image
+at `/opt/chat-ai/sandbox/` — there is no `sandbox.sif` to build.
+
+Each **framework** derived image starts with:
 
 ```
 Bootstrap: localimage

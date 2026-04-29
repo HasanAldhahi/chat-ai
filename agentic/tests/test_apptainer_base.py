@@ -97,6 +97,13 @@ def test_def_from_is_ubuntu_2204(def_text: str):
     )
 
 
+def test_def_files_includes_sandbox_wrapper(def_text: str):
+    files = _section(def_text, "%files")
+    assert files, "Apptainer.def has no %files section"
+    assert "../sandbox/chrome-headless-sandbox.sh" in files
+    assert "/opt/chat-ai/sandbox/chrome-headless-sandbox.sh" in files
+
+
 # --------------------------------------------------------------------------- #
 # Apptainer.def — %post (the bulk of the work)                                #
 # --------------------------------------------------------------------------- #
@@ -122,6 +129,8 @@ REQUIRED_POST_TOKENS = (
     "libgbm1",
     "libxkbcommon0",
     "fonts-liberation",
+    # Task 2.4 — inner sandbox
+    "bubblewrap",
     # Hardening / cleanup
     "--no-install-recommends",
 )
@@ -314,6 +323,8 @@ def test_test_image_script_exercises_acceptance_criteria(test_script_text: str):
         "python3.11 --version",
         "node --version",
         "google-chrome --version",
+        "bwrap --version",
+        "/opt/chat-ai/sandbox/chrome-headless-sandbox.sh",
         "jq --version",
         "git --version",
         "curl --version",

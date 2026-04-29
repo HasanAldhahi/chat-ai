@@ -449,10 +449,12 @@ Package OpenHands V1 agent framework inside the Apptainer container with MCP cli
 - Code reviewed and merged
 - Add health check for OpenHands process
 
+**✅ Implementation complete (2026-04-29):** Shipped on branch `task-2.3-openhands-packaging` (commit `b28afc6` and earlier). Deliverables: `agentic/openhands_runtime/`, `agentic/containers/openhands/`, `test_openhands_runtime.py`, `test_apptainer_openhands.py`. Full tool-call acceptance (`fs_read` / `web_search` against a live LLM) remains an **operator** check via `containers/openhands/test_image.sh` + cluster vLLM.
+
 ---
 
 ### Task 2.4: Inner Sandbox (nsjail/bubblewrap)
-**Status:** 🔴 TODO
+**Status:** 🟢 DONE
 **Priority:** MEDIUM
 **Est. Effort:** 3-4 days
 **Assignee:** TBD
@@ -496,6 +498,8 @@ Configure additional sandboxing using nsjail or bubblewrap to isolate the headle
 - Document sandbox configuration
 - Add monitoring for sandbox violations
 - Code reviewed and merged
+
+**✅ Implementation note (2026-04-29):** `bubblewrap` + `agentic/containers/sandbox/chrome-headless-sandbox.sh` ship inside the **base** image at `/opt/chat-ai/sandbox/` (branch `task-2.4-inner-sandbox`). Static pytest `test_apptainer_sandbox.py`, `test_image.sh` probes for `bwrap` and sandboxed `--version`. Full break-out / internal-IP security tests, Playwright wiring, nsjail swap, and sandbox audit logging are **follow-ups** (see Requirements above).
 
 ---
 
@@ -1257,9 +1261,9 @@ Prepare system for production launch by setting up monitoring, runbooks, documen
   - MEDIUM: 7
   - LOW: 4
 - **Tasks by Status:**
-  - 🔴 TODO: 21
+  - 🔴 TODO: 20
   - 🟡 IN PROGRESS: 0
-  - 🟢 DONE: 10
+  - 🟢 DONE: 11
   - 🔵 BLOCKED: 0
 - **Estimated Total Effort:** 100-135 person-days
 

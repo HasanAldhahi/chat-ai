@@ -32,7 +32,10 @@ This package currently implements:
   SSE forwarder to the broker, config; derived Apptainer image at
   `agentic/containers/openhands/` bootstrapping from `mcp.sif`; structural +
   runtime pytest; full OpenHands→MCP smoke via `containers/openhands/test_image.sh`
-  on a build host)
+- **Task 2.4**: Inner browser sandbox — `bubblewrap` and
+  `containers/sandbox/chrome-headless-sandbox.sh` baked into the **base**
+  image at `/opt/chat-ai/sandbox/` (pytest `test_apptainer_sandbox.py` +
+  `test_image.sh` smoke)
 
 ## Layout
 
@@ -75,7 +78,8 @@ agentic/
 │   ├── sse_forwarder.py    #   OpenHands stdout → POST …/events
 │   └── openhands_config.toml  #   Shipped as /etc/openhands/config.toml in image
 ├── containers/             # Apptainer recipes for per-session runtimes
-│   ├── base/               #   Task 2.1 (Ubuntu 22.04 + Python 3.11 + Node 20 + Chrome)
+│   ├── base/               #   Task 2.1 (+ Task 2.4 bwrap wrapper copied in)
+│   ├── sandbox/            #   Task 2.4 — Chrome wrapper sources (not a separate .sif)
 │   ├── mcp/                #   Task 2.2 (derived from base, runs mcp_server)
 │   └── openhands/          #   Task 2.3 (derived from mcp, OpenHands V1 + launcher)
 ├── tests/
@@ -469,7 +473,7 @@ The test suite covers Tasks 1.1, 1.2, and 1.3 acceptance criteria:
 | 2.1 Base Apptainer Image | done (recipe + build script + structural tests; .sif build deferred to operator) |
 | 2.2 MCP Server Implementation | done (JSON-RPC server, 7 tools — fs/web/code, derived Apptainer image, structural + functional tests) |
 | 2.3 OpenHands Agent Packaging | done (openhands_runtime + openhands.sif recipe, launcher/SSE tests; operator smoke: test_image.sh) |
-| 2.4 Inner Sandbox (nsjail/bubblewrap) | todo |
+| 2.4 Inner Sandbox (nsjail/bubblewrap) | done (bwrap + `chrome-headless-sandbox.sh` in base image; pytest + operator `test_image.sh`) |
 | 2.5 Network Filtering | todo |
 | 2.6 vLLM Integration | todo |
 
@@ -485,8 +489,8 @@ Chrome stable, and the headless-browser runtime libs.
 
 The build is deferred to whoever has cluster / build-host access (the
 dev VM has no `apptainer` binary). The **recipes** are tested here via
-`tests/test_apptainer_base.py`, `test_apptainer_mcp.py`, and
-`test_apptainer_openhands.py` (static parsing — required sections, wiring,
+`tests/test_apptainer_base.py`, `test_apptainer_mcp.py`,
+`test_apptainer_openhands.py`, and `test_apptainer_sandbox.py` (static parsing — required sections, wiring,
 `%runscript --help` exit 0, no proxy hardcode). The **built images** are
 smoke-tested by `containers/*/test_image.sh` on a host with Apptainer
 and the prerequisite `.sif` chain (`base.sif` → `mcp.sif` → `openhands.sif`).

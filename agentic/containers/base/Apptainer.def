@@ -13,6 +13,7 @@ Stage: build
 #   - Python 3.11 (deadsnakes PPA; symlinked at /usr/local/bin/python3)
 #   - Node.js 20 LTS (NodeSource)
 #   - Google Chrome stable (clean .deb, not snap-shimmed chromium-browser)
+#   - bubblewrap (Task 2.4) + /opt/chat-ai/sandbox/chrome-headless-sandbox.sh
 #   - jq, git, curl, wget, gnupg, ca-certificates, tini, xz-utils
 #   - Chromium/Chrome runtime libs for true headless operation (no X11)
 #
@@ -29,13 +30,15 @@ Stage: build
 # isolation (`--net --network=none`) is a runtime flag and is enforced by
 # Task 2.5 (Network Filtering), not this recipe.
 #
-# Build is rootful at build time (--fakeroot or --remote). Run time is
-# strictly rootless (no --fakeroot, no --setuid).
+# Inner browser sandbox: bubblewrap + /opt/chat-ai/sandbox/chrome-headless-
+# sandbox.sh (Task 2.4) restrict Chrome's view of /tmp and mount most of
+# the OS read-only; derived images and Playwright integrations should call
+# Chrome through that wrapper.
 # ---------------------------------------------------------------------------
 
 %files
-    # Intentionally empty. The base image carries no application code.
-    # Agent frameworks (OpenHands etc.) are installed in derived images.
+    # Inner sandbox helper (Task 2.4) — installed with bubblewrap in %post
+    ../sandbox/chrome-headless-sandbox.sh /opt/chat-ai/sandbox/chrome-headless-sandbox.sh
 
 %post
     set -eux
@@ -108,6 +111,15 @@ Stage: build
     apt-get install -y ./google-chrome-stable_current_amd64.deb
     rm -f google-chrome-stable_current_amd64.deb
 
+    # ----- 4b. Bubblewrap + sandbox script (Task 2.4) ----------------------
+    apt-get install -y --no-install-recommends bubblewrap
+    mkdir -p /opt/chat-ai/sandbox
+    chmod 0755 /opt/chat-ai/sandbox/chrome-headless-sandbox.sh
+    bwrap --version >/dev/null 2>&1 || {
+        echo "bubblewrap missing after apt-get install"
+        exit 1
+    }
+
     # ----- 5. Cleanup ------------------------------------------------------
     # Trim apt artefacts (largest contributor to image bloat) and the pip
     # download cache. We deliberately do NOT `rm -rf /tmp/*` or
@@ -161,8 +173,9 @@ EOF
         cat <<EOF
 chat-ai base agent image (Task 2.1)
 
-Tools:    python3.11, node 20, google-chrome (headless), jq, git, curl
+Tools:    python3.11, node 20, google-chrome (headless), bwrap, jq, git, curl
 Mounts:   /workspace (sticky), /home/user, /tmp
+Chrome:   use /opt/chat-ai/sandbox/chrome-headless-sandbox.sh for Task 2.4 isolation
 Proxy:    set APPTAINERENV_HTTPS_PROXY before invoking apptainer run
 
 Examples:
@@ -172,7 +185,7 @@ Examples:
       --bind \$HOME:/home/user:ro base.sif python3.11 my_agent.py
 
 This image is meant to be inherited from. See agentic/containers/README.md
-for derived images (mcp, openhands, sandbox).
+for derived images (mcp, openhands, …).
 EOF
         exit 0
     fi
@@ -204,6 +217,7 @@ EOF
         python3.11               /usr/local/bin/python3 -> 3.11
         node                     20.x LTS
         google-chrome            stable (headless capable, no X11 needed)
+        bwrap                    bubblewrap — inner sandbox for Chrome (Task 2.4)
         jq, git, curl, wget, gnupg, tini, xz-utils
 
     MOUNT POINTS

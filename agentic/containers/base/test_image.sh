@@ -85,6 +85,14 @@ check "jq present"  "$APPTAINER" exec "$SIF" jq --version
 check "git present" "$APPTAINER" exec "$SIF" git --version
 check "curl present" "$APPTAINER" exec "$SIF" curl --version
 
+# ----- 5b. Task 2.4 — bubblewrap + Chrome sandbox wrapper -----
+check_match "bwrap present" "bubblewrap" "$APPTAINER" exec "$SIF" bwrap --version
+check "sandbox wrapper installed" \
+    "$APPTAINER" exec "$SIF" test -x /opt/chat-ai/sandbox/chrome-headless-sandbox.sh
+check_match "sandboxed chrome --version" "Google Chrome" \
+    "$APPTAINER" exec --bind "$(mktemp -d):/workspace" "$SIF" \
+        /opt/chat-ai/sandbox/chrome-headless-sandbox.sh --version
+
 # ----- 6. mount points -----
 TMP=$(mktemp -d)
 check "/workspace bound + writable" \
