@@ -1,4 +1,5 @@
 import { useSelector, useDispatch } from "react-redux";  
+import { useTranslation } from "react-i18next";
 import sendMessage from "../utils/sendMessage";
 import { useModal } from "../modals/ModalContext";
 import { useToast } from "./useToast";
@@ -8,6 +9,7 @@ export function useSendMessage() {
   const dispatch = useDispatch();
   const { openModal } = useModal();
   const { notifyError, notifySuccess } = useToast();
+  const { t } = useTranslation();
   const timeout = useSelector(selectTimeout);
   const memories = useSelector(selectAllMemories);
 
@@ -22,6 +24,7 @@ export function useSendMessage() {
       notifyError,
       notifySuccess,
       timeout,
+      t,
     });
   };
 }

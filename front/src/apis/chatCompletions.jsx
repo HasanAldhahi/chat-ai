@@ -28,8 +28,9 @@ function brokerMessages(messages) {
 
 /**
  * Agent models: Node `/api/chat/agent` → FastAPI → vLLM (Tasks 3.1 + 2.6).
+ * Retries transient browser network failures (Task 3.4).
  */
-async function* agentChatCompletions(conversation, timeout = 30000) {
+async function* agentChatCompletions(conversation, timeout = 30000, hooks = {}) {
   const baseURL = resolveBackendBaseUrl();
   const agentUrl = new URL("api/chat/agent", baseURL).toString();
   const model =
@@ -50,15 +51,40 @@ async function* agentChatCompletions(conversation, timeout = 30000) {
 
   const xUser = resolveAgenticXUser();
 
-  const res = await fetch(agentUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User": xUser,
-    },
-    body: JSON.stringify(body),
-    signal: controller.signal,
-  });
+  const maxAttempts = 3;
+  let res;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      res = await fetch(agentUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User": xUser,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      break;
+    } catch (err) {
+      if (err?.name === "AbortError") throw err;
+      const transient =
+        err instanceof TypeError ||
+        (typeof err?.message === "string" &&
+          /network|failed to fetch|load failed|networkerror|connection/i.test(
+            err.message,
+          ));
+      if (!transient || attempt === maxAttempts) {
+        const e = new Error(
+          err?.message ||
+            "Connection lost. Retrying failed — please try again.",
+        );
+        e.status = 0;
+        throw e;
+      }
+      hooks.onAgentConnectionRetry?.(attempt);
+      await new Promise((r) => setTimeout(r, 600 * attempt));
+    }
+  }
 
   if (!res.ok) {
     let errObj = {};
@@ -69,6 +95,7 @@ async function* agentChatCompletions(conversation, timeout = 30000) {
     }
     const e = new Error(errObj.error || res.statusText || "Agent chat failed");
     e.status = res.status;
+    if (errObj.code) e.code = errObj.code;
     throw e;
   }
 
@@ -106,6 +133,7 @@ async function* chatCompletions (
   conversation,
   timeout = 30000,
   stream = true,
+  hooks = {},
 ) {
   try {
     const model = typeof conversation.settings.model === 'string'
@@ -120,7 +148,7 @@ async function* chatCompletions (
           "";
 
     if (isChatAiAgentModel(conversation.settings.model)) {
-      yield* agentChatCompletions(conversation, timeout);
+      yield* agentChatCompletions(conversation, timeout, hooks);
       return;
     }
 

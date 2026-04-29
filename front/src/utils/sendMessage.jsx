@@ -12,6 +12,7 @@ import {
   normalizeAgentSseActivity,
   startAgentBrokerSse,
 } from "../utils/agentBrokerSse";
+import { normalizeAgentHttpError } from "../utils/agenticErrors";
 import generateMemory from "../apis/generateMemory";
 import generateChoiceProposal from "../apis/generateChoiceProposal";
 import generateTitle from "../apis/generateTitle";
@@ -202,6 +203,7 @@ const sendMessage = async ({
   notifySuccess,
   dispatch,
   timeout,
+  t = (key) => key,
 }) => {
   const conversationId = localState.id
 
@@ -288,11 +290,17 @@ const sendMessage = async ({
       }
     }
     
+    const agentHooks = {
+      onAgentConnectionRetry: () => {
+        notifySuccess(t("agentic.retrying_connection"));
+      },
+    };
+
     if(!setLocalState){   
       // console.log(conversationForAPI);
       // send the message WITHOUT changing the UI with any response
       // TODO handle errors and print them to the user
-      for await (const chunk of chatCompletions(conversationForAPI, timeoutAPI)){
+      for await (const chunk of chatCompletions(conversationForAPI, timeoutAPI, true, agentHooks)){
         console.log(chunk);
       }
       return;
@@ -343,7 +351,7 @@ const sendMessage = async ({
       let process_block = "";
       let inThinking = false;
       let message_text = "";
-      for await (const chunk of chatCompletions(conversationForAPI, timeoutAPI)) {
+      for await (const chunk of chatCompletions(conversationForAPI, timeoutAPI, true, agentHooks)) {
         const delta = chunk?.choices?.[0]?.delta;
         if (chunk?.usage) usage = chunk.usage;
         if (Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0) {
@@ -573,6 +581,7 @@ const sendMessage = async ({
     let chatChunk = null;
     let meta = undefined;
     let choicesProposed = [];
+    let agenticFailure = null;
     try {
       // Get chat completion response
       chatChunk = await getChatChunk(conversationId);
@@ -583,21 +592,30 @@ const sendMessage = async ({
         usage
       };
     } catch (error) {
-      const errorType = error?.type || "Error";
-      const errorMsg = error?.error?.message || error?.error || error?.message || "An unknown error occurred";
-      const errorStatus = error?.status ? `(${error.status})` : "";
-      notifyError(`${errorType}: ${errorMsg.toString()} ${errorStatus}`);
+      if (isChatAiAgentModel(localState.settings.model)) {
+        const norm = normalizeAgentHttpError(error?.status, error?.message);
+        agenticFailure = {
+          message: norm.display,
+          retryable: norm.retryable,
+          status: norm.status,
+        };
+      } else {
+        const errorType = error?.type || "Error";
+        const errorMsg = error?.error?.message || error?.error || error?.message || "An unknown error occurred";
+        const errorStatus = error?.status ? `(${error.status})` : "";
+        notifyError(`${errorType}: ${errorMsg.toString()} ${errorStatus}`);
+      }
       console.error(error);
     } finally {
       // Update choices
-      if(choicesModule && localState.settings.choiceProposer == 1){
+      if(choicesModule && localState.settings.choiceProposer == 1 && !agenticFailure){
         try {
           const content = localState.messages.map((message) => {
           if (Array.isArray(message.content)){
             return message.role + ": " + message.content[0].text;
           }
           });
-          content.push("assistant: " + responseContent[0].text)
+          content.push("assistant: " + (responseContent?.[0]?.text ?? ""))
           console.log(content.join("\n\n"))
 
           const response = await generateChoiceProposal(
@@ -619,10 +637,13 @@ const sendMessage = async ({
           const messages = [...inactiveMsgs,
             {
               role: "assistant",
-              content: responseContent,
+              content: responseContent?.length
+                ? responseContent
+                : [{ type: "text", text: "" }],
               loading: false,
               meta,
               ...(ia?.length ? { agentActivities: ia } : {}),
+              ...(agenticFailure ? { agenticError: agenticFailure } : {}),
             },
             { role: "user", content: [{ type: "text", text: "" }] },
           ];
@@ -637,13 +658,21 @@ const sendMessage = async ({
         const messages = [...prev.messages];
         const idx = messages.length - 2;
         const acts = messages[idx]?.agentActivities;
-        messages[idx] = {
+        const baseRow = {
           role: "assistant",
-          content: responseContent,
+          content: responseContent?.length
+            ? responseContent
+            : [{ type: "text", text: "" }],
           loading: false,
           meta,
           ...(acts?.length ? { agentActivities: acts } : {}),
         };
+        if (agenticFailure) {
+          baseRow.agenticError = agenticFailure;
+        } else {
+          delete baseRow.agenticError;
+        }
+        messages[idx] = baseRow;
         return { ...prev, messages, choices, flush: true };
       });
     }
@@ -660,8 +689,12 @@ const sendMessage = async ({
     // }
     
     // If not successful don't continue
-    if (!responseContent) {
+    if (!responseContent && !agenticFailure) {
       // TODO clean up localState
+      return;
+    }
+
+    if (agenticFailure) {
       return;
     }
 

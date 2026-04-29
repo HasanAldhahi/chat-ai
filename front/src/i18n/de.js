@@ -12,6 +12,7 @@ export default {
     clear: "Löschen",
     abort: "Abbrechen",
     stop_agent: "Agent stoppen",
+    retry: "Erneut versuchen",
     send: "Senden",
     stop: "Anhalten",
     share: "Teilen",
@@ -394,6 +395,9 @@ export default {
     },
     reassurance: "Verwenden Sie einfach den Button unten, um sich anzumelden.",
     buttonText: "Anmelden mit AcademicCloud SSO",
+  },
+  agentic: {
+    retrying_connection: "Verbindung verloren. Erneuter Versuch...",
   },
   not_found: {
     title: "404: Unterhaltung nicht gefunden",

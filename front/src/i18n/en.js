@@ -12,6 +12,7 @@ export default {
     clear: "Clear",
     abort: "Abort",
     stop_agent: "Stop agent",
+    retry: "Retry",
     send: "Send",
     stop: "Stop",
     share: "Share",
@@ -392,6 +393,9 @@ export default {
     },
     reassurance: "Simply use the button below to log in.",
     buttonText: "Login with AcademicCloud SSO",
+  },
+  agentic: {
+    retrying_connection: "Connection lost. Retrying...",
   },
   not_found: {
     title: "404: Conversation Not Found",

@@ -15,7 +15,8 @@ Each feature uses **one branch per task**, with **no merge commits inside the ta
 | `task-2.6-vllm-integration` | Task 2.6 (vLLM + broker/UI bundle in `2ed5263`) | `task-2.5-network-filtering` (`fa1d5b2`) |
 | `task-3.1-node-backend-modification` | Task 3.1 | `task-2.6-vllm-integration` |
 | `task-3.2-react-agent-model-selection` | Task 3.2 | `task-3.1-*` |
-| `task-3.3-react-streaming-ui` | Task 3.3 (in progress) | `task-3.2-*` |
+| `task-3.3-react-streaming-ui` | Task 3.3 | `task-3.2-*` |
+| `task-3.4-agentic-error-handling` | Task 3.4 | `task-3.3-*` |
 
 Start new work: `git checkout task-3.2-react-agent-model-selection && git pull && git checkout -b task-3.3-…` — or reset `task-3.3-*` to match `task-3.2` until the first Task 3.3 commit. Prefer **not** branching `task-3.3` from `001` if `001` has extra doc-only commits: that obscures the task stack; merge `001` into your task branch only when you need those files.
 

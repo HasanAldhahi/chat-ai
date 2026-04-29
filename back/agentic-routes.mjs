@@ -3,13 +3,27 @@
  */
 import fetch from "node-fetch";
 
-/** Map broker HTTP status to Node client response (502/503 → 500). */
+/**
+ * Map broker HTTP status for the browser (Task 3.4).
+ * Upstream unavailable → 503; explicit gateway timeout → 504; other 5xx → 500.
+ */
 export function mapAgenticStatus(status) {
   if (status === 400 || status === 401 || status === 403 || status === 422) {
     return status;
   }
-  if (status === 502 || status === 503) return 500;
+  if (status === 502 || status === 503) return 503;
+  if (status === 504) return 504;
+  if (status >= 500 && status < 600) return 500;
   return status >= 400 ? status : 200;
+}
+
+function brokerFetchSignal(timeoutMs) {
+  const ms = Number(timeoutMs);
+  if (!ms || ms < 1) return undefined;
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms);
+  }
+  return undefined;
 }
 
 /** Model label from chat-style request body (string or { name, id }). */
@@ -56,13 +70,18 @@ export async function proxyAgentChatPost(req, res, options) {
   const xUser = resolveXUser(req);
   if (!xUser) {
     return res.status(401).json({
-      error:
-        "X-User header required for agent chat (or set AGENTIC_DEFAULT_X_USER for dev)",
+      error: "Authentication required. Please log in again.",
+      code: "agentic_auth_required",
     });
   }
   const url = `${brokerUrl.replace(/\/$/, "")}/api/agent/chat`;
   const payload = normalizeAgentChatPayload(req.body, xUser);
+  const timeoutMs =
+    options.brokerTimeoutMs != null
+      ? options.brokerTimeoutMs
+      : Number(process.env.AGENTIC_BROKER_TIMEOUT_MS || 1_800_000);
   try {
+    const brokerSignal = brokerFetchSignal(timeoutMs);
     const response = await fetchImpl(url, {
       method: "POST",
       headers: {
@@ -73,6 +92,7 @@ export async function proxyAgentChatPost(req, res, options) {
           : {}),
       },
       body: JSON.stringify(payload),
+      ...(brokerSignal ? { signal: brokerSignal } : {}),
     });
 
     const ct = (response.headers.get("content-type") || "").toLowerCase();
@@ -93,7 +113,10 @@ export async function proxyAgentChatPost(req, res, options) {
             : detailPayload.message ||
               response.statusText ||
               "agent chat error";
-      return res.status(mapAgenticStatus(response.status)).json({ error: errMsg });
+      const mapped = mapAgenticStatus(response.status);
+      const bodyOut = { error: errMsg };
+      if (detailPayload.code) bodyOut.code = detailPayload.code;
+      return res.status(mapped).json(bodyOut);
     }
 
     if (ct.includes("text/event-stream") && response.body) {
@@ -109,7 +132,18 @@ export async function proxyAgentChatPost(req, res, options) {
     return res.status(200).json(json);
   } catch (err) {
     (options.logger || console).error("POST agent chat proxy error:", err);
-    return res.status(503).json({ error: "agentic broker unavailable" });
+    const name = err && err.name;
+    if (name === "AbortError" || name === "TimeoutError") {
+      return res.status(504).json({
+        error: "Agent session timed out after 30 minutes of inactivity",
+        code: "agentic_timeout",
+      });
+    }
+    return res.status(503).json({
+      error:
+        "Agent service temporarily unavailable. Please try again later.",
+      code: "agentic_unavailable",
+    });
   }
 }
 
@@ -124,7 +158,10 @@ export async function proxyAgentSseGet(req, res, options) {
   }
   const xUser = resolveXUser(req);
   if (!xUser) {
-    return res.status(401).json({ error: "X-User header required" });
+    return res.status(401).json({
+      error: "Authentication required. Please log in again.",
+      code: "agentic_auth_required",
+    });
   }
   const url = `${brokerUrl.replace(/\/$/, "")}/api/sse/${encodeURIComponent(sessionId)}`;
   try {
@@ -138,9 +175,18 @@ export async function proxyAgentSseGet(req, res, options) {
       },
     });
     if (!response.ok) {
+      const txt = await response.text();
+      let errBody = txt;
+      try {
+        const j = JSON.parse(txt);
+        if (j && typeof j.error === "string") errBody = j.error;
+        else if (j && j.detail != null) errBody = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail);
+      } catch {
+        /* plain text */
+      }
       return res
         .status(mapAgenticStatus(response.status))
-        .json({ error: await response.text() });
+        .json({ error: errBody });
     }
     res.status(200);
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -153,7 +199,11 @@ export async function proxyAgentSseGet(req, res, options) {
     }
   } catch (err) {
     (options.logger || console).error("GET agent SSE proxy error:", err);
-    return res.status(503).json({ error: "agentic broker unavailable" });
+    return res.status(503).json({
+      error:
+        "Agent service temporarily unavailable. Please try again later.",
+      code: "agentic_unavailable",
+    });
   }
 }
 

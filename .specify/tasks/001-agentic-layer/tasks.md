@@ -634,7 +634,7 @@ Modify the existing Node.js Express backend to detect agent model selection and 
 - X-User header forwarded to FastAPI broker
 - SSE stream from FastAPI proxied to frontend without modification
 - FastAPI 400/401/403 errors translated to same status in Node response
-- FastAPI 502/503 errors translated to 500 Internal Server Error
+- FastAPI 502/503 errors translated to **503** at the Node proxy (Task 3.4)
 - Request body format matches FastAPI expectations
 - Streaming from FastAPI to frontend works end-to-end
 
@@ -756,7 +756,7 @@ Implement UI components to parse and display SSE messages from the FastAPI broke
 ---
 
 ### Task 3.4: Error Handling & User Feedback
-**Status:** 🟡 IN PROGRESS
+**Status:** ✅ COMPLETE (2026-04-29)
 **Priority:** MEDIUM
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -803,7 +803,9 @@ Backend (Node.js):
 - Document error messages and retry logic
 - Add monitoring for error rates
 
-**🟡 Partial (2026-04-29):** Node maps broker 502/503 → 500; 4xx forwarded. Frontend/agent path relies on existing toast patterns for fetch failures; exhaustive copy for Slurm/container/timeout scenarios not fully mapped in UI.
+**✅ Implementation note (2026-04-29):** Branch **`task-3.4-agentic-error-handling`** from **`task-3.3-react-streaming-ui`**. **Node** (`back/agentic-routes.mjs`): **502/503 → 503**; **504** preserved; other broker **5xx → 500**; POST broker fetch uses `AbortSignal.timeout` (`AGENTIC_BROKER_TIMEOUT_MS`, default 30m) → **504** + timeout body; connection errors → **503** with user copy; missing `X-User` → **401** with login copy. **Front**: `agenticErrors.js` maps status + broker strings (Slurm job id, container/workspace start, session ended, auth, permission, timeout); agent `fetch` **retries ×3** on transient network errors + toast `agentic.retrying_connection`; `sendMessage` stores **`agenticError`** on assistant bubble; `MessageAssistant` shows in-chat alert + **Retry** when `retryable`.
+
+**Branch stack:** **`task-3.4-agentic-error-handling`** builds on **`task-3.3-react-streaming-ui`**.
 
 ---
 
