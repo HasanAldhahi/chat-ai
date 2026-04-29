@@ -692,7 +692,7 @@ Update the React model dropdown to include agent options and distinguish them vi
 - Code reviewed and merged
 - Update documentation with screenshots
 
-**✅ Implementation note (2026-04-29):** `front/src/constants/chatAiAgentModels.js` — four agent rows (incl. smolagents), `isChatAiAgentModel`, extended-field stubs for `ModelSelectorExtended`. `useUpdateModelsData.jsx` prepends catalog. `ModelSelectorSimple` / `ModelSelectorExtended`: **Agents** vs **Chat models** sections, i18n tooltips (`model_selector.*`). `ModelSelectorWrapper`: clears `messages` / `messageCount` when toggling **chat model ↔ agent** (via `getDefaultConversation()` seeds). **Fix:** Extended selector now calls `onChange` (replaced broken `setSelectedModel`). Merge via branch **`task-3.2-react-agent-model-selection`** → `001-agentic-layer`.
+**✅ Implementation note (2026-04-29):** `front/src/constants/chatAiAgentModels.js` — four agent rows (incl. smolagents), `isChatAiAgentModel`, extended-field stubs for `ModelSelectorExtended`. `useUpdateModelsData.jsx` prepends catalog. `ModelSelectorSimple` / `ModelSelectorExtended`: **Agents** vs **Chat models** sections, i18n tooltips (`model_selector.*`). `ModelSelectorWrapper`: clears `messages` / `messageCount` when toggling **chat model ↔ agent** (via `getDefaultConversation()` seeds). **Fix:** Extended selector now calls `onChange` (replaced broken `setSelectedModel`). Merge via branch **`task-3.2-react-agent-model-selection`** → `001-agentic-layer`. **Tests:** `front/npm test` includes `chatAiAgentModels.test.js` (`isChatAiAgentModel`).
 
 ---
 
@@ -749,7 +749,7 @@ Implement UI components to parse and display SSE messages from the FastAPI broke
 - Code reviewed and merged
 - Update documentation with screenshots of agent UI
 
-**✅ Implementation note (2026-04-29):** Parallel **GET `/api/chat/agent/sse`** via `front/src/utils/agentBrokerSse.js` (`startAgentBrokerSse`, shared `AbortSignal` from `getActiveRequestSignal()` in `chatCompletions.jsx`). SSE frames (`event:` + `data:` JSON) append to `assistant.agentActivities` in `sendMessage.jsx` while POST stream updates reply text; activities preserved through finalize. UI: `AgentActivityFeed.jsx` (gray action/result, red error, tool icons, timestamps, Show more/less). **Stop Agent** tooltip on `AbortButton` when an agent model is selected. Agent detection in `chatCompletions.jsx` uses `isChatAiAgentModel`.
+**✅ Implementation note (2026-04-29):** Parallel **GET `/api/chat/agent/sse`** via `front/src/utils/agentBrokerSse.js` (`startAgentBrokerSse`, shared `AbortSignal` from `getActiveRequestSignal()` in `chatCompletions.jsx`). SSE frames (`event:` + `data:` JSON) append to `assistant.agentActivities` in `sendMessage.jsx` while POST stream updates reply text; activities preserved through finalize. UI: `AgentActivityFeed.jsx` (gray action/result, red error, tool icons, timestamps, Show more/less). **Stop Agent** tooltip on `AbortButton` when an agent model is selected. Agent detection in `chatCompletions.jsx` uses `isChatAiAgentModel`. **Tests:** `front/npm test` covers `parseAgentSseBlock`, `readAgentSseBody`, `normalizeAgentSseActivity`, `toolIconForType`.
 
 **Branch stack (2026-04-29):** Implement 3.3 on **`task-3.3-react-streaming-ui`**, branching from **`task-3.2-react-agent-model-selection`** (same tip until the first 3.3 commit); see `.specify/plans/001-agentic-layer/plan.md` → *Git branching (stacked task branches)*.
 
@@ -803,7 +803,7 @@ Backend (Node.js):
 - Document error messages and retry logic
 - Add monitoring for error rates
 
-**✅ Implementation note (2026-04-29):** Branch **`task-3.4-agentic-error-handling`** from **`task-3.3-react-streaming-ui`**. **Node** (`back/agentic-routes.mjs`): **502/503 → 503**; **504** preserved; other broker **5xx → 500**; POST broker fetch uses `AbortSignal.timeout` (`AGENTIC_BROKER_TIMEOUT_MS`, default 30m) → **504** + timeout body; connection errors → **503** with user copy; missing `X-User` → **401** with login copy. **Front**: `agenticErrors.js` maps status + broker strings (Slurm job id, container/workspace start, session ended, auth, permission, timeout); agent `fetch` **retries ×3** on transient network errors + toast `agentic.retrying_connection`; `sendMessage` stores **`agenticError`** on assistant bubble; `MessageAssistant` shows in-chat alert + **Retry** when `retryable`.
+**✅ Implementation note (2026-04-29):** Branch **`task-3.4-agentic-error-handling`** from **`task-3.3-react-streaming-ui`**. **Node** (`back/agentic-routes.mjs`): **502/503 → 503**; **504** preserved; other broker **5xx → 500**; POST broker fetch uses `AbortSignal.timeout` (`AGENTIC_BROKER_TIMEOUT_MS`, default 30m) → **504** + timeout body; connection errors → **503** with user copy; missing `X-User` → **401** with login copy. **Front**: `agenticErrors.js` maps status + broker strings (Slurm job id, container/workspace start, session ended, auth, permission, timeout); agent `fetch` **retries ×3** on transient network errors + toast `agentic.retrying_connection`; `sendMessage` stores **`agenticError`** on assistant bubble; `MessageAssistant` shows in-chat alert + **Retry** when `retryable`. **Tests:** `front/npm test` (Vitest: `agenticErrors`, `agentBrokerSse`, `chatAiAgentModels`).
 
 **Branch stack:** **`task-3.4-agentic-error-handling`** builds on **`task-3.3-react-streaming-ui`**.
 

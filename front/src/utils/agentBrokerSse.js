@@ -3,7 +3,7 @@
  * Parses SSE frames (event + data lines) per Task 1.6 / 3.3.
  */
 
-function resolveBackendBaseUrl() {
+export function resolveBackendBaseUrl() {
   let baseURL = import.meta.env.VITE_BACKEND_ENDPOINT;
   try {
     baseURL = new URL(baseURL).toString();
@@ -42,6 +42,9 @@ function parseSseBlock(block) {
   }
   return { event: eventName, data };
 }
+
+/** Exported for unit tests (Task 3.3 SSE parsing). */
+export { parseSseBlock as parseAgentSseBlock };
 
 /** @returns {boolean} */
 function isCommentOnlyBlock(block) {
