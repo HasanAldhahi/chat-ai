@@ -16,7 +16,6 @@ This document breaks down the implementation plan for the agentic layer into act
 ## PHASE 1: Foundation & Backend Services
 
 ### Task 1.1: FastAPI Application Setup
-**Git branch:** `task-1.1-fastapi-setup`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 1-2 days
@@ -50,7 +49,6 @@ Create the FastAPI microservice that will serve as the session broker for the ag
 ---
 
 ### Task 1.2: Slurm Integration - Job Submission
-**Git branch:** `task-1.2-slurm-job-submission`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
@@ -97,7 +95,6 @@ Implement Slurm REST API client for submitting containerized workspaces to the H
 ---
 
 ### Task 1.3: Slurm Integration - Job Monitoring
-**Git branch:** `task-1.3-slurm-job-monitoring`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2 days
@@ -139,7 +136,6 @@ Implement polling mechanism to monitor Slurm job status and propagate status cha
 ---
 
 ### Task 1.4: Slurm Integration - Job Cancellation
-**Git branch:** `task-1.4-slurm-cancellation`
 **Status:** 🟢 DONE
 **Priority:** MEDIUM
 **Est. Effort:** 1-2 days
@@ -178,7 +174,6 @@ Implement endpoint to cancel running Slurm jobs when user stops the agent or ses
 ---
 
 ### Task 1.5: Vault Integration - Secret Retrieval
-**Git branch:** `task-1.5-vault-secret-retrieval`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
@@ -220,7 +215,6 @@ Implement HashiCorp Vault client for retrieving user-specific secrets (API keys,
 ---
 
 ### Task 1.6: SSE Streaming Infrastructure
-**Git branch:** `task-1.6-sse-streaming`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
@@ -264,7 +258,6 @@ Implement Server-Sent Events (SSE) endpoint for streaming agent outputs from the
 ---
 
 ### Task 1.7: User Authentication & Validation
-**Git branch:** `task-1.7-xuser-auth`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2 days
@@ -311,7 +304,6 @@ Implement authentication middleware to validate X-User header from Kong authenti
 ## PHASE 2: Container & Sandbox Infrastructure
 
 ### Task 2.1: Base Apptainer Image
-**Git branch:** `task-2.1-base-apptainer-image`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
@@ -359,7 +351,6 @@ Create base Apptainer (formerly Singularity) container definition that serves as
 ---
 
 ### Task 2.2: MCP Server Implementation
-**Git branch:** `task-2.2-mcp-server`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 5-7 days
@@ -417,7 +408,6 @@ Implement Model Context Protocol (MCP) server inside the Apptainer container tha
 ---
 
 ### Task 2.3: OpenHands Agent Packaging
-**Git branch:** `task-2.3-openhands-packaging`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 3-4 days
@@ -465,7 +455,6 @@ Package OpenHands V1 agent framework inside the Apptainer container with MCP cli
 ---
 
 ### Task 2.4: Inner Sandbox (nsjail/bubblewrap)
-**Git branch:** `task-2.4-inner-sandbox`
 **Status:** 🟢 DONE
 **Priority:** MEDIUM
 **Est. Effort:** 3-4 days
@@ -516,7 +505,6 @@ Configure additional sandboxing using nsjail or bubblewrap to isolate the headle
 ---
 
 ### Task 2.5: Network Filtering
-**Git branch:** `task-2.5-network-filtering`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
@@ -567,7 +555,6 @@ Configure network filtering to force all outbound web traffic through the GWDG W
 ---
 
 ### Task 2.6: vLLM Integration
-**Git branch:** `task-2.6-vllm-integration`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 1-2 days
@@ -604,14 +591,13 @@ Configure agent frameworks to use the existing vLLM inference server with Hermes
 - Add monitoring for LLM API latency and errors
 - Code reviewed and merged
 
-**✅ Implementation note (2026-04-29):** **Branch:** `task-2.6-vllm-integration` — created from `task-2.5-network-filtering` (`fa1d5b2`); tip **`2ed5263`** (vLLM + broker agent chat + `code_check` pyflakes fix). Use `git diff fa1d5b2..task-2.6-vllm-integration` for an isolated 2.6 delta. Broker `Settings` adds `vllm_base_url`, `vllm_model`, `vllm_timeout_s`, `vllm_api_key` (optional). Client `agentic/app/clients/vllm.py` (`stream_chat_completion`, `chat_completion_json`). Routes: `POST /api/agent/chat` (requires `X-User`; model id must contain substring `agent`; streams SSE chunks or JSON from vLLM OpenAI-compatible API), `GET /api/vllm/health`. Tests: `agentic/tests/test_vllm_agent_chat.py` (httpx mocking). Operator still wires real vLLM URL/model in prod and validates Hermes tool-call flow inside cluster agents.
+**✅ Implementation note (2026-04-29):** Broker `Settings` adds `vllm_base_url`, `vllm_model`, `vllm_timeout_s`, `vllm_api_key` (optional). Client `agentic/app/clients/vllm.py` (`stream_chat_completion`, `chat_completion_json`). Routes: `POST /api/agent/chat` (requires `X-User`; model id must contain substring `agent`; streams SSE chunks or JSON from vLLM OpenAI-compatible API), `GET /api/vllm/health`. Tests: `agentic/tests/test_vllm_agent_chat.py` (httpx mocking). Operator still wires real vLLM URL/model in prod and validates Hermes tool-call flow inside cluster agents.
 
 ---
 
 ## PHASE 3: Frontend Integration
 
 ### Task 3.1: Node.js Backend Modification
-**Git branch:** `task-3.1-node-backend-modification`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
@@ -666,7 +652,6 @@ Modify the existing Node.js Express backend to detect agent model selection and 
 ---
 
 ### Task 3.2: React Frontend - Agent Model Selection
-**Git branch:** `task-3.2-react-agent-model-selection`
 **Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
@@ -712,7 +697,6 @@ Update the React model dropdown to include agent options and distinguish them vi
 ---
 
 ### Task 3.3: React Frontend - Real-Time Streaming UI
-**Git branch:** `task-3.3-react-streaming-ui`
 **Status:** ✅ COMPLETE (2026-04-29)
 **Priority:** HIGH
 **Est. Effort:** 3-4 days
@@ -769,12 +753,9 @@ Implement UI components to parse and display SSE messages from the FastAPI broke
 
 **Branch stack (2026-04-29):** Implement 3.3 on **`task-3.3-react-streaming-ui`**, branching from **`task-3.2-react-agent-model-selection`** (same tip until the first 3.3 commit); see `.specify/plans/001-agentic-layer/plan.md` → *Git branching (stacked task branches)*.
 
-**Branch stack (2026-04-29):** Implement 3.3 on **`task-3.3-react-streaming-ui`**, branching from **`task-3.2-react-agent-model-selection`** (same tip until the first 3.3 commit); see `.specify/plans/001-agentic-layer/plan.md` → *Git branching (stacked task branches)*.
-
 ---
 
 ### Task 3.4: Error Handling & User Feedback
-**Git branch:** `task-3.4-agentic-error-handling`
 **Status:** ✅ COMPLETE (2026-04-29)
 **Priority:** MEDIUM
 **Est. Effort:** 2-3 days
@@ -831,7 +812,6 @@ Backend (Node.js):
 ## PHASE 4: Multi-Agent Framework Support
 
 ### Task 4.1: Goose Agent Packaging
-**Git branch:** `task-4.1-goose-agent-packaging`
 **Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 2-3 days
@@ -873,12 +853,11 @@ Package the Goose agent framework inside the Apptainer container with MCP client
 - Code reviewed and merged
 - Add health check for Goose process
 
-**🟡 Scaffold (2026-04-29):** `agentic/containers/goose/README.md` documents intended layout; full Apptainer recipe + build parity with OpenHands — TODO.
+**🟡 Progress (2026-04-29):** `agentic/containers/goose/Apptainer.def` bootstraps `../mcp/mcp.sif`, installs Goose via official `download_cli.sh` (`CONFIGURE=false`, `/usr/local/bin/goose`), `entrypoint.sh`, `build_image.sh`, `test_image.sh`, README. **`agentic/tests/test_apptainer_goose.py`** static checks. **Remainder:** broker-facing launcher (MCP `/health` + Goose + SSE parity with `openhands_runtime.launcher`), end-to-end tool calls, Goose prompt/tool config against MCP.
 
 ---
 
 ### Task 4.2: smolagents Packaging
-**Git branch:** `task-4.2-smolagents-packaging`
 **Status:** ⏭️ SKIPPED
 **Priority:** LOW
 **Est. Effort:** 2-3 days
@@ -914,7 +893,6 @@ Package the Hugging Face smolagents framework inside the Apptainer container wit
 ---
 
 ### Task 4.3: sst/opencode Packaging
-**Git branch:** `task-4.3-opencode-packaging`
 **Status:** 🟡 IN PROGRESS
 **Priority:** LOW
 **Est. Effort:** 2-3 days
@@ -950,7 +928,6 @@ Package the sst/opencode framework inside the Apptainer container with MCP suppo
 ---
 
 ### Task 4.4: Agent Skills Framework
-**Git branch:** `task-4.4-agent-skills-framework`
 **Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 4-5 days
@@ -1003,7 +980,6 @@ Implement the Agent Skills system, which loads Markdown instruction files (SKILL
 ---
 
 ### Task 4.5: Multi-Agent Selection UI
-**Git branch:** `task-4.5-multi-agent-selection-ui`
 **Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 1-2 days
@@ -1046,7 +1022,6 @@ Update the React frontend to allow users to select from multiple agent framework
 **📋 Planning (2026-04-29):** Operator-facing execution checklists for Tasks 5.1–5.5 are in `.specify/tasks/001-agentic-layer/PRODUCTION_CHECKLIST.md`. Traceability test: `agentic/tests/test_phase5_artifacts.py`.
 
 ### Task 5.1: Security Penetration Testing
-**Git branch:** `task-5.1-security-penetration-testing`
 **Status:** 🔴 TODO
 **Priority:** HIGH
 **Est. Effort:** 5-7 days
@@ -1106,7 +1081,6 @@ Conduct comprehensive security penetration testing to identify vulnerabilities i
 ---
 
 ### Task 5.2: End-to-End Testing
-**Git branch:** `task-5.2-end-to-end-testing`
 **Status:** 🔴 TODO
 **Priority:** HIGH
 **Est. Effort:** 4-5 days
@@ -1153,7 +1127,6 @@ Write and execute end-to-end tests covering all user stories from the specificat
 ---
 
 ### Task 5.3: Performance Testing
-**Git branch:** `task-5.3-performance-testing`
 **Status:** 🔴 TODO
 **Priority:** HIGH
 **Est. Effort:** 4-5 days
@@ -1206,7 +1179,6 @@ Perform load testing to verify the system can handle 100+ concurrent users and m
 ---
 
 ### Task 5.4: User Acceptance Testing (UAT)
-**Git branch:** `task-5.4-user-acceptance-testing`
 **Status:** 🔴 TODO
 **Priority:** HIGH
 **Est. Effort:** 2-3 weeks
@@ -1255,7 +1227,6 @@ Deploy to beta test environment and gather feedback from 10-20 real users to val
 ---
 
 ### Task 5.5: Production Readiness
-**Git branch:** `task-5.5-production-readiness`
 **Status:** 🔴 TODO
 **Priority:** HIGH
 **Est. Effort:** 1 week

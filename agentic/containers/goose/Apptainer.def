@@ -1,0 +1,106 @@
+Bootstrap: localimage
+From: ../mcp/mcp.sif
+Stage: build
+
+# ---------------------------------------------------------------------------
+# chat-ai Goose agent image (Task 4.1, 001-agentic-layer).
+#
+# Bootstraps from the MCP image (Task 2.2). Installs the AAIF Goose CLI
+# binary (Rust) via the official download_cli.sh installer, non-interactive.
+#
+# Runtime: /opt/agentic/entrypoint.sh → goose (see entrypoint). Full
+# MCP + broker SSE orchestration (parity with openhands_runtime.launcher)
+# is phased in separately; this image validates Goose + MCP tooling stack.
+# ---------------------------------------------------------------------------
+
+%files
+    entrypoint.sh /opt/agentic/entrypoint.sh
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export PATH=/usr/local/bin:/usr/bin:/bin
+
+    # Goose release tarball extracts with tar -j (needs bzip2).
+    apt-get update -qq
+    apt-get install -y --no-install-recommends bash bzip2 ca-certificates curl
+    rm -rf /var/lib/apt/lists/*
+
+    chmod +x /opt/agentic/entrypoint.sh
+
+    # Official installer: https://github.com/aaif-goose/goose (see README upstream).
+    export GOOSE_BIN_DIR=/usr/local/bin
+    export CONFIGURE=false
+    export INSTALL_OS=linux
+    curl -fsSL "https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh" \
+        | bash
+
+    goose --version
+
+    # Build metadata — parent stamp overridden.
+    : "${BUILD_SHA:=unknown}"
+    : "${BUILD_DATE:=unknown}"
+    cat > /etc/chat-ai-image-info <<EOF
+image=goose
+task=4.1
+version=0.1.0
+git_sha=${BUILD_SHA}
+build_date=${BUILD_DATE}
+parent=mcp
+mcp_port=8080
+EOF
+
+%environment
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PATH=/usr/local/bin:/usr/bin:/bin
+    export MCP_SERVER_URL=${MCP_SERVER_URL:-http://localhost:8080}
+    export MCP_SERVER_PORT=${MCP_SERVER_PORT:-8080}
+    # Broker injects cluster vLLM + proxy per session (see plan).
+    export LLM_API_URL=${LLM_API_URL:-http://localhost:11434/v1/completions}
+    export LLM_MODEL=${LLM_MODEL:-qwen3-30b-a3b-instruct-2507}
+    export HTTPS_PROXY=${HTTPS_PROXY:-http://www-cache.gwdg.de:3128}
+    export HTTP_PROXY=${HTTP_PROXY:-http://www-cache.gwdg.de:3128}
+    export PYTHONPATH=/opt/agentic:${PYTHONPATH:-}
+
+%runscript
+    #!/bin/sh
+    if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+        cat <<EOF
+chat-ai Goose agent image (Task 4.1)
+
+Default invocation runs Goose from /workspace via entrypoint:
+
+    /opt/agentic/entrypoint.sh
+
+Examples:
+  apptainer run goose.sif goose --help
+  apptainer run goose.sif goose session     # typical broker usage (TBD wiring)
+
+Broker plumbs MCP, LLM*, and HTTPS_PROXY via APPTAINERENV_* env vars.
+
+Build order: base → mcp → goose (see README in this directory).
+
+EOF
+        exit 0
+    fi
+    if [ "$#" -gt 0 ]; then
+        exec "$@"
+    fi
+    exec /opt/agentic/entrypoint.sh
+
+%startscript
+    exec /opt/agentic/entrypoint.sh
+
+%labels
+    org.chat-ai.image goose
+    org.chat-ai.task 4.1
+    org.chat-ai.version 0.1.0
+    org.chat-ai.parent mcp
+    org.chat-ai.mcp_port 8080
+    org.chat-ai.framework goose-cli
+    org.opencontainers.image.title chat-ai-goose-agent
+    org.opencontainers.image.description Goose CLI + MCP stack for Chat AI agents
+
+%help
+    Task 4.1 Goose agent image — see README.md in agentic/containers/goose/
