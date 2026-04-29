@@ -27,7 +27,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterable, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterable, Callable, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -36,6 +36,9 @@ log = logging.getLogger("openhands-sse-forwarder")
 
 
 VALID_EVENTS = ("action", "result", "error", "message")
+
+
+LineTranslator = Callable[[str], Optional[Dict[str, Any]]]
 
 
 @dataclass
@@ -143,15 +146,19 @@ async def forward_stream(
     timeout_s: float = 5.0,
     max_inflight: int = 32,
     http_client: Optional[httpx.AsyncClient] = None,
+    translate_line: LineTranslator = translate_openhands_line,
 ) -> ForwarderStats:
     """Read lines from ``lines`` and POST translated events to the broker.
 
     If ``broker_sse_url`` is falsy, behaves as a tee that just counts
     raw lines (useful for ``--no-broker`` dry runs and unit tests).
 
+    ``translate_line`` defaults to OpenHands semantics; Goose can swap
+    in its own heuristic without forking POST wiring (Task 4.1).
+
     Returns a :class:`ForwarderStats` once the input stream closes.
     Designed for graceful degradation: a broker outage / 5xx never
-    blocks the OpenHands subprocess — dropped events are counted and
+    blocks the agent subprocess — dropped events are counted and
     logged.
     """
     stats = ForwarderStats()
@@ -176,7 +183,7 @@ async def forward_stream(
     async def producer() -> None:
         async for raw in lines:
             stats.raw_lines += 1
-            translated = translate_openhands_line(raw)
+            translated = translate_line(raw)
             if translated is None:
                 continue
             try:

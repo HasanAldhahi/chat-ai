@@ -45,6 +45,9 @@ check "goose --version exits 0" \
 check "entrypoint executable" \
     "$APPTAINER" exec "$SIF" test -x /opt/agentic/entrypoint.sh
 
+check "goose_runtime.launcher imports" \
+    "$APPTAINER" exec "$SIF" python3.11 -c "import goose_runtime.launcher"
+
 check "mcp_server importable (parent)" \
     "$APPTAINER" exec "$SIF" python3.11 -c "from mcp_server.main import app"
 

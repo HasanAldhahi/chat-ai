@@ -1,17 +1,12 @@
 #!/bin/sh
-# entrypoint.sh — Goose image default run (Task 4.1).
-# Broker may override argv; default is goose --help (non-interactive sanity).
+# Default session entry — Goose orchestrator (Task 4.1).
 #
-# POSIX sh.
-
+# Broker sets APPTAINERENV_GOOSE_* and APPTAINERENV_* for MCP / SSE / HOME.
 set -eu
 
-WORKSPACE="${GOOSE_WORKSPACE:-/workspace}"
-mkdir -p "$WORKSPACE"
-cd "$WORKSPACE"
+export PYTHONPATH="${PYTHONPATH:-}:/opt/agentic"
+WORKDIR="${HOME:-/workspace}"
+mkdir -p "$WORKDIR"
+cd "$WORKDIR"
 
-if [ "$#" -gt 0 ]; then
-  exec goose "$@"
-fi
-
-exec goose --help
+exec python3.11 -m goose_runtime.launcher "$@"

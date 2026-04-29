@@ -40,3 +40,10 @@ def test_scripts_executable_bit():
         mode = p.stat().st_mode
         assert mode & 0o111, f"not executable: {p}"
 
+
+def test_bundles_python_runtime(def_text: str):
+    assert "../../goose_runtime /opt/agentic/goose_runtime" in def_text
+
+
+def test_post_imports_goose_runtime(def_text: str):
+    assert "goose_runtime.launcher" in def_text

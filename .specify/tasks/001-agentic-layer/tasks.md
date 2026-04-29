@@ -853,7 +853,14 @@ Package the Goose agent framework inside the Apptainer container with MCP client
 - Code reviewed and merged
 - Add health check for Goose process
 
-**🟡 Progress (2026-04-29):** `agentic/containers/goose/Apptainer.def` bootstraps `../mcp/mcp.sif`, installs Goose via official `download_cli.sh` (`CONFIGURE=false`, `/usr/local/bin/goose`), `entrypoint.sh`, `build_image.sh`, `test_image.sh`, README. **`agentic/tests/test_apptainer_goose.py`** static checks. **Remainder:** broker-facing launcher (MCP `/health` + Goose + SSE parity with `openhands_runtime.launcher`), end-to-end tool calls, Goose prompt/tool config against MCP.
+**✅ Implementation note (2026-04-29):**
+- **`agentic/goose_runtime/`**: `launcher` (MCP uvicorn → `/health` → headless Goose + `openhands_runtime.sse_forwarder.forward_stream` toward broker SSE), **`mcp_stdio_bridge`** (newline JSON-RPC over stdio ↔ **`POST …/rpc`**), **`goose_yaml`** (`extensions.chat-ai-mcp`). **`GOOSE_*`** settings; **`GOOSE_DEV_COMMAND_OVERRIDE=/bin/true`** for smoke without real Goose.
+- **`mcp_server/server.py`** dispatch adds **`initialize`**, **`tools/list`**, **`tools/call`** (MCP aliases; existing chat-ai methods unchanged).
+- **`openhands_runtime/sse_forwarder.py`**: `forward_stream(..., translate_line=...)`.
+- **Image:** `containers/goose/Apptainer.def` copies `goose_runtime/`; **`entrypoint.sh`** runs `python3.11 -m goose_runtime.launcher`.
+- **Tests:** `pytest` adds `tests/test_goose_runtime.py`, `tests/test_mcp_rpc_aliases.py`; **`agentic` suite passes**; **`test_apptainer_goose`** static recipe checks.
+
+**Remainder:** cluster-operator E2E (real provider + vLLM + Goose MCP tool round-trip); Goose recipe/provider tuning per site.
 
 ---
 

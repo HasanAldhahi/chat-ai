@@ -3,8 +3,9 @@
 The MCP wire protocol (in this implementation) is plain JSON-RPC 2.0
 over a single HTTP POST endpoint at ``/rpc``. Two methods:
 
-- ``list_tools`` — no params; returns ``{"tools": [<descriptor>...]}``
-- ``call_tool`` — params ``{"name": <str>, "arguments": <dict>}``
+- ``initialize`` — MCP-compat handshake (returns protocolVersion)
+- ``list_tools`` / ``tools/list`` — tool discovery
+- ``call_tool`` / ``tools/call`` — invocation
 
 Anything else -> ``method_not_found``. We intentionally keep this
 narrow; new capabilities should be new tools, not new methods.
@@ -97,6 +98,28 @@ async def dispatch(payload: Any) -> Dict[str, Any]:
     method = req["method"]
     params = req["params"]
     req_id = req["id"]
+
+    # MCP / Goose-compatible aliases (narrow JSON-RPC server; Task 4.1)
+    if method == "initialize":
+        return _envelope(
+            req_id,
+            result={
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "chat-ai-mcp", "version": "0.1.0"},
+            },
+        )
+
+    if method in ("notifications/initialized", "initialized"):
+        # JSON-RPC notifications may omit id; callers should send null id.
+        return _envelope(req_id, result={})
+
+    if method in ("tools/list", "tools.list"):
+        return _envelope(req_id, result={"tools": list_descriptors()})
+
+    if method in ("tools/call", "tools.call"):
+        # Same payload shape as call_tool (`name` / `arguments`).
+        return await _call_tool(req_id, params)
 
     if method == "list_tools":
         log.info("rpc.list_tools", extra={"request_id": req_id})
