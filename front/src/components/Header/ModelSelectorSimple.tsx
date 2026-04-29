@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import type { BaseModelInfo } from "../../types/models";
 import Tooltip from "../Others/Tooltip";
 import DemandIndicator from "./DemandIndicator";
+import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
 
 const sortOptions = [
   { value: "name-asc", label: "Name (A→Z)" },
@@ -72,8 +73,24 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
     return result;
   }, [searchQuery, modelsData, sortBy]);
 
+  const { agentModels, chatModels } = useMemo(() => {
+    const agents: BaseModelInfo[] = [];
+    const chat: BaseModelInfo[] = [];
+    for (const m of filteredModelsList) {
+      if (isChatAiAgentModel(m)) agents.push(m);
+      else chat.push(m);
+    }
+    return { agentModels: agents, chatModels: chat };
+  }, [filteredModelsList]);
+
   // use memo to not rerender on search input
   const ListElement = memo(({ idx, model, selected, onClick }: { idx: number, model: BaseModelInfo, selected: boolean, onClick: () => void }) => {
+    const agentRow = isChatAiAgentModel(model);
+    const label = (
+      <span className="font-medium">
+        {model.name}
+      </span>
+    );
     return (
       <div
         onClick={onClick}
@@ -85,16 +102,13 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
             <div className="pl-1">
               <DemandIndicator demand={model.demand} status={model?.status} />
             </div>
-            <span
-              className="font-medium"
-              title={
-                String(model.name || model.id).includes("Agent")
-                  ? "Agents can use tools (web, files, code)"
-                  : undefined
-              }
-            >
-              {model.name}
-            </span>
+            {agentRow ? (
+              <Tooltip text={t("model_selector.agent_tooltip")} placement="bottom">
+                {label}
+              </Tooltip>
+            ) : (
+              label
+            )}
           </div>
           <div className="ml-2 flex items-center gap-1 text-tertiary">
             {model.input?.includes("image") && <Tooltip text={"Image Input"}><FontAwesomeIcon icon={faImage} /></Tooltip>}
@@ -210,13 +224,39 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
 
         {/** Results List **/}
         <div id="model-listbox" role="listbox" aria-label="Models" tabIndex={-1} className="max-h-96 overflow-auto px-2">
-          <div className="rounded-xl overflow-hidden">
-            {filteredModelsList.map((m, idx) => (
-              <ListElement
-                key={m.id}
-                onClick={() => { setSelectedModel(m); setDropdownOpen(false); }}
-                idx={idx} model={m} selected={selectedModel?.id === m.id} />
-            ))}
+          <div className="rounded-xl overflow-hidden grid gap-0.5 py-1">
+            {agentModels.length > 0 && (
+              <>
+                <div
+                  className="sticky top-0 z-10 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 bg-white/95 dark:bg-bg_secondary_dark/95 border-b border-slate-100 dark:border-slate-600"
+                  role="presentation"
+                >
+                  {t("model_selector.agents_group")}
+                </div>
+                {agentModels.map((m, idx) => (
+                  <ListElement
+                    key={m.id}
+                    onClick={() => { setSelectedModel(m); setDropdownOpen(false); }}
+                    idx={idx} model={m} selected={selectedModel?.id === m.id} />
+                ))}
+              </>
+            )}
+            {chatModels.length > 0 && (
+              <>
+                <div
+                  className="sticky top-0 z-10 px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 bg-white/95 dark:bg-bg_secondary_dark/95 border-b border-slate-100 dark:border-slate-600"
+                  role="presentation"
+                >
+                  {t("model_selector.chat_models_group")}
+                </div>
+                {chatModels.map((m, idx) => (
+                  <ListElement
+                    key={m.id}
+                    onClick={() => { setSelectedModel(m); setDropdownOpen(false); }}
+                    idx={idx} model={m} selected={selectedModel?.id === m.id} />
+                ))}
+              </>
+            )}
           </div>
         </div>
       </div>

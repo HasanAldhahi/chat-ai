@@ -692,7 +692,7 @@ Update the React model dropdown to include agent options and distinguish them vi
 - Code reviewed and merged
 - Update documentation with screenshots
 
-**✅ Implementation note (2026-04-29):** `front/src/hooks/useUpdateModelsData.jsx` prepends static agent models (OpenHands, Goose, opencode — **not** smolagents; see Task 4.2). `ModelSelectorSimple.tsx` tooltips for agent rows. Meets grouped + 🤖 + tooltip intent; full design review / screenshots still optional.
+**✅ Implementation note (2026-04-29):** `front/src/constants/chatAiAgentModels.js` — four agent rows (incl. smolagents), `isChatAiAgentModel`, extended-field stubs for `ModelSelectorExtended`. `useUpdateModelsData.jsx` prepends catalog. `ModelSelectorSimple` / `ModelSelectorExtended`: **Agents** vs **Chat models** sections, i18n tooltips (`model_selector.*`). `ModelSelectorWrapper`: clears `messages` / `messageCount` when toggling **chat model ↔ agent** (via `getDefaultConversation()` seeds). **Fix:** Extended selector now calls `onChange` (replaced broken `setSelectedModel`). Merge via branch **`task-3.2-react-agent-model-selection`** → `001-agentic-layer`.
 
 ---
 

@@ -3,7 +3,9 @@ import { memo, useEffect, useState, useRef } from 'react'
 import ModelSelectorSimple from "./ModelSelectorSimple";
 import ModelSelectorExtended from "./ModelSelectorExtended";
 import { useModal } from '../../modals/ModalContext';
-import type { ModelInfo } from '../../types/models';
+import type { ModelInfo, ExtendedModelInfo } from '../../types/models';
+import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
+import { getDefaultConversation } from "../../utils/conversationUtils";
 
 function ModelSelectorWrapper({modelsData, localState, setLocalState, inHeader = false}: {modelsData: [ModelInfo], localState: any, setLocalState: any, inHeader: boolean}) {
   /*
@@ -15,20 +17,38 @@ function ModelSelectorWrapper({modelsData, localState, setLocalState, inHeader =
   const [selectedModel, setSelectedModel] = useState<ModelInfo | null>(null);
   //const selectedModel = modelsData ? modelsData.find(model => model.id === currentModelId) || modelsData[0] || null : null;
 
-  const hasExtendedModels = modelsData?.[0]?.description !== undefined;
+  const hasExtendedModels =
+    Array.isArray(modelsData) &&
+    modelsData.length > 0 &&
+    "description" in modelsData[0] &&
+    (modelsData[0] as ExtendedModelInfo).description !== undefined;
 
   function setModel(newModel: ModelInfo) {
     if (newModel?.status === "offline") {
       openModal("serviceOffline");
     }
     setSelectedModel(newModel);
-    setLocalState((prev) => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        model: newModel,
-      },
-    }));
+    setLocalState((prev) => {
+      const wasAgent = isChatAiAgentModel(prev.settings?.model);
+      const nowAgent = isChatAiAgentModel(newModel);
+      const next = {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          model: newModel,
+        },
+      };
+      if (wasAgent !== nowAgent) {
+        const fresh = getDefaultConversation();
+        return {
+          ...next,
+          messages: fresh.messages,
+          messageCount: fresh.messageCount,
+          lastModified: Date.now(),
+        };
+      }
+      return next;
+    });
   }
 
   // currentModelId has changed indirectly

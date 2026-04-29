@@ -20,6 +20,7 @@ import { faCalendar, faRectangleList } from '@fortawesome/free-regular-svg-icons
 import DemandIndicator from "./DemandIndicator";
 
 import type { ExtendedModelInfo } from "../../types/models";
+import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
 
 import {
   faArrowUpAZ,
@@ -105,6 +106,24 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
     return result;
   }, [searchQuery, modelsData, sortBy]);
 
+  const { agentModels, chatModels } = useMemo(() => {
+    const agents: ExtendedModelInfo[] = [];
+    const chat: ExtendedModelInfo[] = [];
+    for (const m of filteredModelsList) {
+      if (isChatAiAgentModel(m)) agents.push(m);
+      else chat.push(m);
+    }
+    return { agentModels: agents, chatModels: chat };
+  }, [filteredModelsList]);
+
+  const sectionHeadingClass =
+    "px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-600";
+
+  const pickModel = (m: ExtendedModelInfo) => {
+    onChange?.(m);
+    setDropdownOpen(false);
+  };
+
   const SecureIndicator = memo(({ external }: { external: boolean }) => {
     return (
       <>
@@ -153,7 +172,15 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
             <div className="pl-1">
               <DemandIndicator demand={model.demand} status={model?.status} />
             </div>
-            <span className="font-medium">{model.name}</span>
+            <span className="font-medium">
+              {isChatAiAgentModel(model) ? (
+                <Tooltip text={t("model_selector.agent_tooltip")} placement="bottom">
+                  <span>{model.name}</span>
+                </Tooltip>
+              ) : (
+                model.name
+              )}
+            </span>
             <SecureIndicator external={model.external} />
             <Chip text={model.company} />
 
@@ -196,7 +223,15 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
           <div className="pl-1">
             <DemandIndicator demand={model.demand} status={model?.status} />
           </div>
-          <span className="font-medium">{model.name}</span>
+          <span className="font-medium">
+            {isChatAiAgentModel(model) ? (
+              <Tooltip text={t("model_selector.agent_tooltip")} placement="bottom">
+                <span>{model.name}</span>
+              </Tooltip>
+            ) : (
+              model.name
+            )}
+          </span>
           <SecureIndicator external={model.external} />
           <span className="text-xs text-slate-500 dark:text-slate-300">
             <FontAwesomeIcon icon={faCalendar} className="mr-1" />
@@ -464,34 +499,79 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
         <div id="model-listbox" role="listbox" aria-label="Models" tabIndex={-1} className="max-h-110 overflow-auto px-2">
           {resultViewMode === 'list' && (
             <div className="rounded-xl overflow-hidden grid gap-1 py-2">
-              {filteredModelsList.map((m, idx) => (
-                <ListElement
-                  key={m.id} idx={idx} model={m}
-                  onClick={() => { setSelectedModel(m); setDropdownOpen(false); }} />
-              ))}
+              {agentModels.length > 0 && (
+                <>
+                  <div className={sectionHeadingClass} role="presentation">{t("model_selector.agents_group")}</div>
+                  {agentModels.map((m, idx) => (
+                    <ListElement
+                      key={m.id} idx={idx} model={m}
+                      onClick={() => pickModel(m)} />
+                  ))}
+                </>
+              )}
+              {chatModels.length > 0 && (
+                <>
+                  <div className={sectionHeadingClass} role="presentation">{t("model_selector.chat_models_group")}</div>
+                  {chatModels.map((m, idx) => (
+                    <ListElement
+                      key={m.id} idx={idx} model={m}
+                      onClick={() => pickModel(m)} />
+                  ))}
+                </>
+              )}
             </div>
           )}
           {resultViewMode === 'extended' && (
             <div className="rounded-xl overflow-hidden grid gap-1 py-2">
-              {filteredModelsList.map((m, idx) => (
-                <ExtendedListElement
-                  key={m.id} idx={idx} model={m}
-                  onClick={() => { setSelectedModel(m); setDropdownOpen(false); }} />
-              ))}
+              {agentModels.length > 0 && (
+                <>
+                  <div className={sectionHeadingClass} role="presentation">{t("model_selector.agents_group")}</div>
+                  {agentModels.map((m, idx) => (
+                    <ExtendedListElement
+                      key={m.id} idx={idx} model={m}
+                      onClick={() => pickModel(m)} />
+                  ))}
+                </>
+              )}
+              {chatModels.length > 0 && (
+                <>
+                  <div className={sectionHeadingClass} role="presentation">{t("model_selector.chat_models_group")}</div>
+                  {chatModels.map((m, idx) => (
+                    <ExtendedListElement
+                      key={m.id} idx={idx} model={m}
+                      onClick={() => pickModel(m)} />
+                  ))}
+                </>
+              )}
             </div>
           )}
 
           {resultViewMode === 'grid' && (
             <div className="overflow-hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 py-2">
-              {filteredModelsList.map((m, idx) => (
-                <span
-                  onClick={() => { setSelectedModel(m); setDropdownOpen(false); }}
-                >
-                  <GridElement
-                    key={m.id} idx={idx} model={m}
-                    onClick={() => { setSelectedModel(m); setDropdownOpen(false); }} />
-                </span>
-              ))}
+              {agentModels.length > 0 && (
+                <>
+                  <div className={`col-span-full ${sectionHeadingClass}`} role="presentation">{t("model_selector.agents_group")}</div>
+                  {agentModels.map((m, idx) => (
+                    <GridElement
+                      key={m.id}
+                      idx={idx}
+                      model={m}
+                      onClick={() => pickModel(m)} />
+                  ))}
+                </>
+              )}
+              {chatModels.length > 0 && (
+                <>
+                  <div className={`col-span-full ${sectionHeadingClass}`} role="presentation">{t("model_selector.chat_models_group")}</div>
+                  {chatModels.map((m, idx) => (
+                    <GridElement
+                      key={m.id}
+                      idx={idx}
+                      model={m}
+                      onClick={() => pickModel(m)} />
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
