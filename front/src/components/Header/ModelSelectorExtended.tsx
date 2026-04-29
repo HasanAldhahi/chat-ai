@@ -20,7 +20,7 @@ import { faCalendar, faRectangleList } from '@fortawesome/free-regular-svg-icons
 import DemandIndicator from "./DemandIndicator";
 
 import type { ExtendedModelInfo } from "../../types/models";
-import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
+import { isChatAiAgentModel, chatAiAgentTooltipI18nSuffix } from "../../constants/chatAiAgentModels";
 
 import {
   faArrowUpAZ,
@@ -174,7 +174,7 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
             </div>
             <span className="font-medium">
               {isChatAiAgentModel(model) ? (
-                <Tooltip text={t("model_selector.agent_tooltip")} placement="bottom">
+                <Tooltip text={t(`model_selector.${chatAiAgentTooltipI18nSuffix(model)}`)} placement="bottom">
                   <span>{model.name}</span>
                 </Tooltip>
               ) : (
@@ -225,7 +225,7 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
           </div>
           <span className="font-medium">
             {isChatAiAgentModel(model) ? (
-              <Tooltip text={t("model_selector.agent_tooltip")} placement="bottom">
+                <Tooltip text={t(`model_selector.${chatAiAgentTooltipI18nSuffix(model)}`)} placement="bottom">
                 <span>{model.name}</span>
               </Tooltip>
             ) : (
@@ -279,7 +279,13 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
               <span className="pr-1">
                 <SecureIndicator external={model.external} />
               </span>
-              {model.name}
+              {isChatAiAgentModel(model) ? (
+                <Tooltip text={t(`model_selector.${chatAiAgentTooltipI18nSuffix(model)}`)} placement="bottom">
+                  <span>{model.name}</span>
+                </Tooltip>
+              ) : (
+                model.name
+              )}
             </div>
             <Chip text={model.company} />
 
@@ -351,7 +357,15 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
             <div className="pl-2">
               <DemandIndicator demand={selectedModel?.demand} status={selectedModel?.status} />
             </div>
-            <span className="font-medium">{selectedModel?.name}</span>
+            <span className="font-medium">
+              {selectedModel && isChatAiAgentModel(selectedModel) ? (
+                <Tooltip text={t(`model_selector.${chatAiAgentTooltipI18nSuffix(selectedModel)}`)} placement="bottom">
+                  <span>{selectedModel.name}</span>
+                </Tooltip>
+              ) : (
+                selectedModel?.name
+              )}
+            </span>
             {selectedModel?.external == true && (<Chip text={"External"} colorPreset={"orange"} />)}
             <Chip text={selectedModel?.company} />
             <span className="text-xs text-slate-500 dark:text-slate-300 hidden sm:inline-block">

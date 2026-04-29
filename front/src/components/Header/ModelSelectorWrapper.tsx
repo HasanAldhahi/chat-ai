@@ -31,6 +31,10 @@ function ModelSelectorWrapper({modelsData, localState, setLocalState, inHeader =
     setLocalState((prev) => {
       const wasAgent = isChatAiAgentModel(prev.settings?.model);
       const nowAgent = isChatAiAgentModel(newModel);
+      const prevAgentId = prev.settings?.model?.id;
+      const nextAgentId = newModel?.id;
+      const switchingBetweenAgents =
+        wasAgent && nowAgent && prevAgentId !== nextAgentId;
       const next = {
         ...prev,
         settings: {
@@ -38,7 +42,7 @@ function ModelSelectorWrapper({modelsData, localState, setLocalState, inHeader =
           model: newModel,
         },
       };
-      if (wasAgent !== nowAgent) {
+      if (wasAgent !== nowAgent || switchingBetweenAgents) {
         const fresh = getDefaultConversation();
         return {
           ...next,

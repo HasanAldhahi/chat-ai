@@ -288,6 +288,14 @@ export default {
     agents_group: "Agenten",
     chat_models_group: "Chat-Modelle",
     agent_tooltip: "Agenten können Werkzeuge nutzen (Web, Dateien, Code)",
+    agent_openhands_tooltip:
+      "OpenHands-Agent: MCP-Werkzeuge für Web, Arbeitsverzeichnis und Python (Standard)",
+    agent_goose_tooltip:
+      "Goose-Agent: MCP-gestützte Tools; schnelle mehrstufige Überlegungen über den Broker",
+    agent_smolagents_tooltip:
+      "smolagents-Profil: leichtgewichtige Hugging Face-Nutzung (abhängig vom Cluster-Image)",
+    agent_opencode_tooltip:
+      "OpenCode-Agent: sst/opencode-CLI mit MCP für entwicklerorientierte Aufgaben",
   },
   // Tour
   tour: {

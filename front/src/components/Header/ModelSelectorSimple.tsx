@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next";
 import type { BaseModelInfo } from "../../types/models";
 import Tooltip from "../Others/Tooltip";
 import DemandIndicator from "./DemandIndicator";
-import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
+import { isChatAiAgentModel, chatAiAgentTooltipI18nSuffix } from "../../constants/chatAiAgentModels";
 
 const sortOptions = [
   { value: "name-asc", label: "Name (A→Z)" },
@@ -85,7 +85,9 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
 
   // use memo to not rerender on search input
   const ListElement = memo(({ idx, model, selected, onClick }: { idx: number, model: BaseModelInfo, selected: boolean, onClick: () => void }) => {
-    const agentRow = isChatAiAgentModel(model);
+    const agentTooltip = agentRow
+      ? t(`model_selector.${chatAiAgentTooltipI18nSuffix(model)}`)
+      : "";
     const label = (
       <span className="font-medium">
         {model.name}
@@ -103,7 +105,7 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
               <DemandIndicator demand={model.demand} status={model?.status} />
             </div>
             {agentRow ? (
-              <Tooltip text={t("model_selector.agent_tooltip")} placement="bottom">
+              <Tooltip text={agentTooltip} placement="bottom">
                 {label}
               </Tooltip>
             ) : (
@@ -139,7 +141,16 @@ export default function ModelSelectorSimple({ selectedModel, modelsData, onChang
             <div className="pl-2">
               <DemandIndicator demand={selectedModel?.demand} status={selectedModel?.status} />
             </div>
-            <span className="font-medium truncate">{selectedModel?.name}</span>
+            {isChatAiAgentModel(selectedModel ?? null) ? (
+              <Tooltip
+                text={t(`model_selector.${chatAiAgentTooltipI18nSuffix(selectedModel)}`)}
+                placement="bottom"
+              >
+                <span className="font-medium truncate">{selectedModel?.name}</span>
+              </Tooltip>
+            ) : (
+              <span className="font-medium truncate">{selectedModel?.name}</span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

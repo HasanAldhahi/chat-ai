@@ -1007,7 +1007,7 @@ Implement the Agent Skills system, which loads Markdown instruction files (SKILL
 ---
 
 ### Task 4.5: Multi-Agent Selection UI
-**Status:** 🟡 IN PROGRESS
+**Status:** 🟢 COMPLETE
 **Priority:** MEDIUM
 **Est. Effort:** 1-2 days
 **Assignee:** TBD
@@ -1040,7 +1040,13 @@ Update the React frontend to allow users to select from multiple agent framework
 - Code reviewed and merged
 - Update documentation with agent descriptions
 
-**🟡 Partial (2026-04-29):** Three agents in dropdown + tooltips; **fourth** (smolagents) omitted with Task 4.2. Backend receives agent model id via existing chat payload.
+**✅ Implementation note (2026-04-29):**
+- **`chatAiAgentModels.js`**: four agents with stable **`CHAT_AI_AGENT_ID_*`**; per-agent **`description`** (extended selector); **`chatAiAgentTooltipI18nSuffix`** → **`model_selector.agent_*_tooltip`**.
+- **i18n** `en.js` / `de.js`: **`agent_openhands_tooltip`**, **`agent_goose_tooltip`**, **`agent_smolagents_tooltip`**, **`agent_opencode_tooltip`** (+ generic **`agent_tooltip`** fallback).
+- **`ModelSelectorSimple` / `ModelSelectorExtended`**: tooltips on dropdown rows, grid, and trigger; **`ModelSelectorWrapper`**: clearing conversation when switching **chat↔agent** or **between agents** (different `model.id`).
+- **Persistence**: unchanged — **`redux-persist`** `last_conversation` / **`user_settings`** (selected model travels with conversation state).
+
+**Branch stack:** **`task-4.5-multi-agent-selection-ui`** from **`task-4.4-agent-skills-framework`**.
 
 ---
 

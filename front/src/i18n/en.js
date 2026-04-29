@@ -289,6 +289,14 @@ export default {
     agents_group: "Agents",
     chat_models_group: "Chat models",
     agent_tooltip: "Agents can use tools (web, files, code)",
+    agent_openhands_tooltip:
+      "OpenHands agent: tools for web browsing, workspace files, and Python checks via MCP (default)",
+    agent_goose_tooltip:
+      "Goose agent: MCP-backed tools with fast chained reasoning through the broker",
+    agent_smolagents_tooltip:
+      "smolagents profile: lightweight Hugging Face tooling on the cluster (packaging-dependent)",
+    agent_opencode_tooltip:
+      "OpenCode agent: sst/opencode CLI with MCP for terminal-style coding workloads",
   },
   // Tour
   tour: {
