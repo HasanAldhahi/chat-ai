@@ -2,7 +2,16 @@
 import OpenAI from "openai";
 import { useSelector } from "react-redux";
 import { editMemory, addMemory, selectAllMemories } from "../Redux/reducers/userSettingsReducer";
-import { chatCompletions } from "../apis/chatCompletions";
+import {
+  chatCompletions,
+  getActiveRequestSignal,
+} from "../apis/chatCompletions";
+import { isChatAiAgentModel } from "../constants/chatAiAgentModels";
+import {
+  isAgentSseEventName,
+  normalizeAgentSseActivity,
+  startAgentBrokerSse,
+} from "../utils/agentBrokerSse";
 import generateMemory from "../apis/generateMemory";
 import generateChoiceProposal from "../apis/generateChoiceProposal";
 import generateTitle from "../apis/generateTitle";
@@ -303,13 +312,39 @@ const sendMessage = async ({
 
     // Stream assistant response into localState
     async function getChatChunk(conversationId, messageId = null) {
+      const modelForAgent = localState.settings.model;
+      if (isChatAiAgentModel(modelForAgent) && conversationId) {
+        startAgentBrokerSse({
+          sessionId: conversationId,
+          signal: getActiveRequestSignal(),
+          onFrame: (frame) => {
+            if (!isAgentSseEventName(frame.event)) return;
+            setLocalState((prev) => {
+              if (prev.id !== conversationId) return prev;
+              const messages = [...prev.messages];
+              const idx = messages.length - 2;
+              const row = messages[idx];
+              if (!row || row.role !== "assistant") return prev;
+              const prevActs = row.agentActivities || [];
+              const activity = normalizeAgentSseActivity(frame);
+              messages[idx] = {
+                ...row,
+                agentActivities: [...prevActs, activity],
+                loading: true,
+              };
+              return { ...prev, messages, ignoreConflict: true };
+            });
+          },
+        });
+      }
+
       let currentContent = [{"type": "text", "text": ""}];
       let usage = null;
       let process_block = "";
       let inThinking = false;
       let message_text = "";
       for await (const chunk of chatCompletions(conversationForAPI, timeoutAPI)) {
-        const delta = chunk?.choices[0]?.delta;
+        const delta = chunk?.choices?.[0]?.delta;
         if (chunk?.usage) usage = chunk.usage;
         if (Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0) {
           try {
@@ -477,10 +512,13 @@ const sendMessage = async ({
               return prev;
             }
             const messages = [...prev.messages];
-            messages[messages.length - 2] = {
+            const idx = messages.length - 2;
+            const acts = messages[idx]?.agentActivities;
+            messages[idx] = {
               role: "assistant",
               content: currentContent,
               loading: true,
+              ...(acts?.length ? { agentActivities: acts } : {}),
             };
             return { ...prev, messages, ignoreConflict: true };
           });
@@ -508,10 +546,13 @@ const sendMessage = async ({
             return prev;
           }
           const messages = [...prev.messages];
-          messages[messages.length - 2] = {
+          const idx = messages.length - 2;
+          const acts = messages[idx]?.agentActivities;
+          messages[idx] = {
             role: "assistant",
             content: currentContent,
             loading: true,
+            ...(acts?.length ? { agentActivities: acts } : {}),
           };
           return { ...prev, messages, ignoreConflict: true };
         });
@@ -573,8 +614,16 @@ const sendMessage = async ({
       setLocalState(prev => {
         if (prev.id !== conversationId) {
           // Handle save when conversation is not active, ideally save directly into DB (TODO)
-          const messages = [...localState.messages,
-            { role: "assistant", content: responseContent, loading: false, meta },
+          const inactiveMsgs = [...localState.messages];
+          const ia = inactiveMsgs[inactiveMsgs.length - 2]?.agentActivities;
+          const messages = [...inactiveMsgs,
+            {
+              role: "assistant",
+              content: responseContent,
+              loading: false,
+              meta,
+              ...(ia?.length ? { agentActivities: ia } : {}),
+            },
             { role: "user", content: [{ type: "text", text: "" }] },
           ];
           updateConversation(
@@ -586,11 +635,14 @@ const sendMessage = async ({
         }
         const choices = choicesProposed;
         const messages = [...prev.messages];
-        messages[messages.length - 2] = {
+        const idx = messages.length - 2;
+        const acts = messages[idx]?.agentActivities;
+        messages[idx] = {
           role: "assistant",
           content: responseContent,
           loading: false,
-          meta
+          meta,
+          ...(acts?.length ? { agentActivities: acts } : {}),
         };
         return { ...prev, messages, choices, flush: true };
       });

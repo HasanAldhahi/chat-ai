@@ -11,6 +11,7 @@ export default {
     summarize: "Zusammenfassen und ersetzen",
     clear: "Löschen",
     abort: "Abbrechen",
+    stop_agent: "Agent stoppen",
     send: "Senden",
     stop: "Anhalten",
     share: "Teilen",

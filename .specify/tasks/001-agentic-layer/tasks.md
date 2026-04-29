@@ -697,7 +697,7 @@ Update the React model dropdown to include agent options and distinguish them vi
 ---
 
 ### Task 3.3: React Frontend - Real-Time Streaming UI
-**Status:** 🟡 IN PROGRESS
+**Status:** ✅ COMPLETE (2026-04-29)
 **Priority:** HIGH
 **Est. Effort:** 3-4 days
 **Assignee:** TBD
@@ -749,7 +749,7 @@ Implement UI components to parse and display SSE messages from the FastAPI broke
 - Code reviewed and merged
 - Update documentation with screenshots of agent UI
 
-**🟡 Partial (2026-04-29):** Agent model traffic uses `front/src/apis/chatCompletions.jsx` → `fetch` to `/api/chat/agent`, parses SSE `data:` lines into the existing streaming assistant loop (token/chunk path). **Not done:** dedicated gray action/result boxes, per-tool icons, “Show more”, separate “Stop Agent” control — still standard stop/generation UX.
+**✅ Implementation note (2026-04-29):** Parallel **GET `/api/chat/agent/sse`** via `front/src/utils/agentBrokerSse.js` (`startAgentBrokerSse`, shared `AbortSignal` from `getActiveRequestSignal()` in `chatCompletions.jsx`). SSE frames (`event:` + `data:` JSON) append to `assistant.agentActivities` in `sendMessage.jsx` while POST stream updates reply text; activities preserved through finalize. UI: `AgentActivityFeed.jsx` (gray action/result, red error, tool icons, timestamps, Show more/less). **Stop Agent** tooltip on `AbortButton` when an agent model is selected. Agent detection in `chatCompletions.jsx` uses `isChatAiAgentModel`.
 
 **Branch stack (2026-04-29):** Implement 3.3 on **`task-3.3-react-streaming-ui`**, branching from **`task-3.2-react-agent-model-selection`** (same tip until the first 3.3 commit); see `.specify/plans/001-agentic-layer/plan.md` → *Git branching (stacked task branches)*.
 

@@ -11,6 +11,7 @@ export default {
     summarize: "Summarize and Replace",
     clear: "Clear",
     abort: "Abort",
+    stop_agent: "Stop agent",
     send: "Send",
     stop: "Stop",
     share: "Share",
