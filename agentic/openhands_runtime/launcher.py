@@ -111,7 +111,7 @@ def build_openhands_env(
     if settings.https_proxy:
         env["HTTP_PROXY"] = settings.https_proxy
         env["HTTPS_PROXY"] = settings.https_proxy
-        env["NO_PROXY"] = "localhost,127.0.0.1"
+        env["NO_PROXY"] = settings.no_proxy
     # Make the inner OpenHands process emit on unbuffered stdout so
     # we can stream its output to SSE in near-real-time.
     env["PYTHONUNBUFFERED"] = "1"

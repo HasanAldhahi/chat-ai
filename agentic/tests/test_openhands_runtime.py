@@ -328,7 +328,7 @@ def test_build_openhands_env_propagates_proxy_when_set():
     env = launcher.build_openhands_env(settings, base_env={})
     assert env["HTTP_PROXY"] == "http://www-cache.gwdg.de:3128"
     assert env["HTTPS_PROXY"] == "http://www-cache.gwdg.de:3128"
-    assert env["NO_PROXY"] == "localhost,127.0.0.1"
+    assert env["NO_PROXY"] == "localhost,127.0.0.1,::1,vllm-service.cluster"
 
 
 def test_build_openhands_env_skips_proxy_when_unset():

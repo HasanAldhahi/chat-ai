@@ -300,10 +300,10 @@ class SlurmClient:
     def _build_payload(self, req: JobSubmissionRequest) -> Dict[str, Any]:
         s = self._settings
         env_map: Dict[str, str] = {
-            # Force agent egress through the GWDG WWW-Cache proxy (FR-007).
-            "HTTP_PROXY": "http://www-cache.gwdg.de:3128",
-            "HTTPS_PROXY": "http://www-cache.gwdg.de:3128",
-            "NO_PROXY": "localhost,127.0.0.1",
+            # Force agent egress through the GWDG WWW-Cache proxy (Task 2.5).
+            "HTTP_PROXY": s.cluster_http_proxy,
+            "HTTPS_PROXY": s.cluster_https_proxy,
+            "NO_PROXY": s.cluster_no_proxy,
         }
         env_map.update(req.environment or {})
         # slurmrestd expects a list of "KEY=VALUE" strings.

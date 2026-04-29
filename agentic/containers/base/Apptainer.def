@@ -164,8 +164,11 @@ EOF
     export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
     export PYTHONDONTWRITEBYTECODE=1
     export PYTHONUNBUFFERED=1
-    # Proxy is intentionally NOT hardcoded. The broker injects per-session:
-    #   APPTAINERENV_HTTPS_PROXY=http://www-cache.gwdg.de:3128 apptainer run ...
+    # Task 2.5: default GWDG WWW-Cache egress (curl, Python, Chrome). The
+    # broker may override per-session via APPTAINERENV_HTTP(S)_PROXY / NO_PROXY.
+    export HTTP_PROXY=http://www-cache.gwdg.de:3128
+    export HTTPS_PROXY=http://www-cache.gwdg.de:3128
+    export NO_PROXY=localhost,127.0.0.1,::1,vllm-service.cluster
 
 %runscript
     #!/bin/sh
@@ -176,7 +179,7 @@ chat-ai base agent image (Task 2.1)
 Tools:    python3.11, node 20, google-chrome (headless), bwrap, jq, git, curl
 Mounts:   /workspace (sticky), /home/user, /tmp
 Chrome:   use /opt/chat-ai/sandbox/chrome-headless-sandbox.sh for Task 2.4 isolation
-Proxy:    set APPTAINERENV_HTTPS_PROXY before invoking apptainer run
+Proxy:    GWDG WWW-Cache defaults (Task 2.5); override with APPTAINERENV_* if needed
 
 Examples:
   apptainer run base.sif python3.11 --version

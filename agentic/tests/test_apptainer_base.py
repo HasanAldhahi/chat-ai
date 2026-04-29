@@ -172,20 +172,30 @@ def test_def_post_uses_strict_shell(def_text: str):
 
 
 # --------------------------------------------------------------------------- #
-# Apptainer.def — %environment (negative tests)                               #
+# Apptainer.def — %environment (Task 2.5 proxy defaults + negative tests)     #
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.parametrize(
-    "var", ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
-            "http_proxy", "https_proxy", "no_proxy"],
-)
-def test_def_environment_does_not_hardcode_proxy(def_text: str, var: str):
-    """Proxy is per-session; the broker injects it via APPTAINERENV_*."""
+
+def test_def_environment_has_gwdg_proxy_defaults(def_text: str):
+    """Task 2.5: curl/Python inherit GWDG WWW-Cache unless broker overrides."""
     env = _section(def_text, "%environment")
     assert env, "Apptainer.def has no %environment section"
+    assert "HTTP_PROXY=http://www-cache.gwdg.de:3128" in env.replace(" ", "")
+    assert "HTTPS_PROXY=http://www-cache.gwdg.de:3128" in env.replace(" ", "")
+    assert "NO_PROXY=" in env
+    assert "vllm-service.cluster" in env
+
+
+@pytest.mark.parametrize(
+    "var", ["http_proxy", "https_proxy", "no_proxy"],
+)
+def test_def_environment_does_not_duplicate_lower_case_proxy(
+    def_text: str, var: str
+):
+    """Lower-case proxy vars can fight libcurl; only upper-case exports."""
+    env = _section(def_text, "%environment")
     assert not re.search(rf"^\s*export\s+{var}=", env, re.MULTILINE), (
-        f"%environment must not hardcode {var}; the broker plumbs proxy "
-        f"per-session via APPTAINERENV_{var.upper()}."
+        f"%environment should not export lower-case {var}; use upper-case."
     )
 
 

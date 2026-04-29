@@ -9,22 +9,23 @@ Two responsibilities:
 
 2. **URL containment** for the web tools — only http(s), reject
    private / loopback / link-local IPs, reject bare IP literals that
-   resolve to internal ranges. Hostnames are accepted as-is at the
-   API layer; the network layer (httpx + proxy) is what actually
-   resolves them, and the broker's egress proxy is the load-bearing
-   defence (Task 2.5). This module is a *first-pass* filter that
-   catches obvious bypass attempts (URL-encoded localhost, decimal
-   IP, etc.).
+   resolve to internal ranges, and reject hostnames that match
+   configured internal suffixes (Task 2.5). DNS for other hostnames
+   still resolves inside httpx; the GWDG WWW-Cache egress policy is
+   complementary.
 """
 
 from __future__ import annotations
 
 import ipaddress
+import logging
 from pathlib import Path
 from typing import Iterable, Optional
 from urllib.parse import urlparse
 
 from .errors import ToolError, ToolErrorCode
+
+log = logging.getLogger("mcp_server.security")
 
 
 # --------------------------------------------------------------------------- #
@@ -131,6 +132,28 @@ def _is_blocked_ip(ip: ipaddress._BaseAddress) -> bool:
     )
 
 
+def hostname_blocked(hostname: str, patterns: Iterable[str]) -> bool:
+    """Return True if hostname matches an internal / blocked pattern.
+
+    * ``internal.gwdg.de`` blocks that host and any subdomain.
+    * ``.internal`` (leading dot in config) blocks ``foo.internal`` and
+      the apex label ``internal``.
+    """
+    h = hostname.lower().rstrip(".")
+    for raw in patterns:
+        pat = raw.strip().lower().rstrip(".")
+        if not pat:
+            continue
+        if pat.startswith("."):
+            suf = pat[1:]
+            if h == suf or h.endswith("." + suf):
+                return True
+        else:
+            if h == pat or h.endswith("." + pat):
+                return True
+    return False
+
+
 def validate_url(url: str) -> str:
     """Validate a URL for the web_browse tool.
 
@@ -142,12 +165,11 @@ def validate_url(url: str) -> str:
     - host literal in a private / loopback / link-local / reserved
       range (catches ``http://10.0.0.1``, ``http://127.0.0.1``,
       ``http://[::1]``)
-
-    Note: hostnames (e.g. ``http://internal.gwdg.de``) are *not*
-    blocked here — DNS resolution to an internal address is caught
-    by the egress proxy (Task 2.5). Pre-resolving DNS in this layer
-    would create false positives for legitimate cached hosts.
+    - hostname on the configured internal block list (Task 2.5),
+      e.g. ``internal.gwdg.de``
     """
+    from . import config
+
     if not isinstance(url, str) or not url:
         raise ToolError(
             code=ToolErrorCode.URL_INVALID,
@@ -173,9 +195,28 @@ def validate_url(url: str) -> str:
     except ValueError:
         ip = None
     if ip is not None and _is_blocked_ip(ip):
+        log.warning(
+            "mcp_url_blocked",
+            extra={
+                "url": url,
+                "host": host,
+                "reason": "blocked_ip_literal",
+            },
+        )
         raise ToolError(
             code=ToolErrorCode.URL_BLOCKED,
             message=f"refusing to browse private/loopback address {host}",
+        )
+
+    blocklist = tuple(config.get_settings().web_blocked_host_suffixes)
+    if ip is None and hostname_blocked(host, blocklist):
+        log.warning(
+            "mcp_url_blocked",
+            extra={"url": url, "host": host, "reason": "blocked_hostname"},
+        )
+        raise ToolError(
+            code=ToolErrorCode.URL_BLOCKED,
+            message=f"refusing to browse blocked host {host!r}",
         )
 
     return url

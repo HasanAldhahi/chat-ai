@@ -34,6 +34,7 @@ async def _client(timeout_s: float) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=timeout_s,
         follow_redirects=True,
+        trust_env=True,
         **proxy_kwargs(s.web_proxy_url),
     )
 

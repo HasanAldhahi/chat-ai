@@ -504,7 +504,7 @@ Configure additional sandboxing using nsjail or bubblewrap to isolate the headle
 ---
 
 ### Task 2.5: Network Filtering
-**Status:** 🔴 TODO
+**Status:** 🟢 DONE
 **Priority:** HIGH
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -548,6 +548,8 @@ Configure network filtering to force all outbound web traffic through the GWDG W
 - Create IP address parsing utility with tests
 - Code reviewed and merged
 - GWDG network team compliance verified
+
+**✅ Implementation note (2026-04-29):** Broker `Settings` adds `AGENTIC_CLUSTER_HTTP_PROXY`, `AGENTIC_CLUSTER_HTTPS_PROXY`, `AGENTIC_CLUSTER_NO_PROXY` (defaults: GWDG cache + `NO_PROXY` incl. `vllm-service.cluster`). Slurm job payload injects them. Base image `%environment` sets the same defaults so `curl` uses the cache. MCP: `web_blocked_host_suffixes`, `validate_url` hostname blocking, WARNING logs (`mcp_url_blocked`), explicit `trust_env=True` on httpx. **GWDG proxy team sign-off** remains an operator checklist item.
 
 ---
 
@@ -1261,9 +1263,9 @@ Prepare system for production launch by setting up monitoring, runbooks, documen
   - MEDIUM: 7
   - LOW: 4
 - **Tasks by Status:**
-  - 🔴 TODO: 20
+  - 🔴 TODO: 19
   - 🟡 IN PROGRESS: 0
-  - 🟢 DONE: 11
+  - 🟢 DONE: 12
   - 🔵 BLOCKED: 0
 - **Estimated Total Effort:** 100-135 person-days
 

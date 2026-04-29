@@ -165,21 +165,22 @@ def test_def_post_image_info_marks_task(def_text: str):
 
 
 # --------------------------------------------------------------------------- #
-# %environment — no proxy hardcode + sensible defaults                        #
+# %environment — proxy defaults come from base image (Task 2.5)              #
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.parametrize(
-    "var", ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
-            "http_proxy", "https_proxy", "no_proxy"],
-)
-def test_def_environment_no_proxy_hardcode(def_text: str, var: str):
+
+def test_def_environment_defers_proxy_to_base(def_text: str):
     env = _section(def_text, "%environment")
     assert env, "Apptainer.def has no %environment section"
-    # The recipe ships defaults like OPENHANDS_MCP_SERVER_URL but must
-    # not bake in a proxy.
-    assert not re.search(rf"^\s*export\s+{var}=", env, re.MULTILINE), (
-        f"%environment must not hardcode {var}; broker plumbs per-session."
-    )
+    assert not re.search(r"^\s*export\s+HTTP_PROXY=", env, re.MULTILINE)
+    assert not re.search(r"^\s*export\s+HTTPS_PROXY=", env, re.MULTILINE)
+    assert not re.search(r"^\s*export\s+NO_PROXY=", env, re.MULTILINE)
+
+
+@pytest.mark.parametrize("var", ["http_proxy", "https_proxy", "no_proxy"])
+def test_def_environment_no_lower_case_proxy(def_text: str, var: str):
+    env = _section(def_text, "%environment")
+    assert not re.search(rf"^\s*export\s+{var}=", env, re.MULTILINE)
 
 
 def test_def_environment_pythonpath_includes_agentic(def_text: str):

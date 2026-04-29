@@ -80,7 +80,8 @@ EOF
     # so this is a defence-in-depth, not the primary entry point.
     export PYTHONPATH=/opt/agentic:${PYTHONPATH:-}
     export MCP_SERVER_PORT=${MCP_SERVER_PORT:-8080}
-    # Proxy is intentionally NOT hardcoded — broker plumbs per-session.
+    # Proxy defaults live in the base image (Task 2.5); broker may override
+    # per-session with APPTAINERENV_*.
 
 %runscript
     #!/bin/sh

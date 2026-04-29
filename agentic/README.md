@@ -36,6 +36,10 @@ This package currently implements:
   `containers/sandbox/chrome-headless-sandbox.sh` baked into the **base**
   image at `/opt/chat-ai/sandbox/` (pytest `test_apptainer_sandbox.py` +
   `test_image.sh` smoke)
+- **Task 2.5**: Network filtering — broker `AGENTIC_CLUSTER_*_PROXY` /
+  `NO_PROXY` injected into Slurm jobs; GWDG defaults in base image
+  `%environment`; MCP `web_blocked_host_suffixes` + structured block
+  logs
 
 ## Layout
 
@@ -474,7 +478,7 @@ The test suite covers Tasks 1.1, 1.2, and 1.3 acceptance criteria:
 | 2.2 MCP Server Implementation | done (JSON-RPC server, 7 tools — fs/web/code, derived Apptainer image, structural + functional tests) |
 | 2.3 OpenHands Agent Packaging | done (openhands_runtime + openhands.sif recipe, launcher/SSE tests; operator smoke: test_image.sh) |
 | 2.4 Inner Sandbox (nsjail/bubblewrap) | done (bwrap + `chrome-headless-sandbox.sh` in base image; pytest + operator `test_image.sh`) |
-| 2.5 Network Filtering | todo |
+| 2.5 Network Filtering | done (cluster proxy settings, base image env, MCP hostname blocklist + logs) |
 | 2.6 vLLM Integration | todo |
 
 ## Phase 2: Container & Sandbox Infrastructure
@@ -491,6 +495,6 @@ The build is deferred to whoever has cluster / build-host access (the
 dev VM has no `apptainer` binary). The **recipes** are tested here via
 `tests/test_apptainer_base.py`, `test_apptainer_mcp.py`,
 `test_apptainer_openhands.py`, and `test_apptainer_sandbox.py` (static parsing — required sections, wiring,
-`%runscript --help` exit 0, no proxy hardcode). The **built images** are
+`%runscript --help` exit 0; base image exports GWDG proxy defaults per Task 2.5).
 smoke-tested by `containers/*/test_image.sh` on a host with Apptainer
 and the prerequisite `.sif` chain (`base.sif` → `mcp.sif` → `openhands.sif`).

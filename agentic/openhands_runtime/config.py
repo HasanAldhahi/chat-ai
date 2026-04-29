@@ -136,6 +136,11 @@ class OpenHandsSettings(BaseSettings):
         "outbound HTTPS goes through the GWDG WWW-Cache. Mirrors what "
         "the broker plumbs via APPTAINERENV_HTTPS_PROXY.",
     )
+    no_proxy: str = Field(
+        default="localhost,127.0.0.1,::1,vllm-service.cluster",
+        description="NO_PROXY when https_proxy is set; must align with "
+        "broker AGENTIC_CLUSTER_NO_PROXY / Slurm job env (Task 2.5).",
+    )
 
 
 @lru_cache

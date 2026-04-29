@@ -70,6 +70,20 @@ class Settings(BaseSettings):
     # development before HPC integration is available.
     slurm_mock_mode: bool = Field(default=False)
 
+    # --- Cluster egress proxy (Task 2.5) -----------------------------------
+    cluster_http_proxy: str = Field(
+        default="http://www-cache.gwdg.de:3128",
+        description="HTTP_PROXY injected into every Slurm agent job.",
+    )
+    cluster_https_proxy: str = Field(
+        default="http://www-cache.gwdg.de:3128",
+        description="HTTPS_PROXY injected into every Slurm agent job.",
+    )
+    cluster_no_proxy: str = Field(
+        default="localhost,127.0.0.1,::1,vllm-service.cluster",
+        description="NO_PROXY for agent jobs — loopback MCP + vLLM hostname.",
+    )
+
     # --- Vault ---------------------------------------------------------------
     vault_base_url: str = Field(
         default="http://localhost:8200",

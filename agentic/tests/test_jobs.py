@@ -94,6 +94,8 @@ def test_submit_success_returns_job_id_and_forwards_bearer():
     # Proxy + caller-supplied env both injected.
     env: List[str] = job["environment"]
     assert "HTTP_PROXY=http://www-cache.gwdg.de:3128" in env
+    assert "HTTPS_PROXY=http://www-cache.gwdg.de:3128" in env
+    assert "NO_PROXY=localhost,127.0.0.1,::1,vllm-service.cluster" in env
     assert "VAULT_TOKEN=redacted" in env
 
 

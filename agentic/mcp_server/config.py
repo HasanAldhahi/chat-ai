@@ -86,6 +86,17 @@ class MCPSettings(BaseSettings):
         description="API key for the search provider. Plumbed in from "
         "Vault by the broker; never logged.",
     )
+    web_blocked_host_suffixes: List[str] = Field(
+        default_factory=lambda: [
+            "internal.gwdg.de",
+            ".internal",
+            ".local",
+            ".corp",
+        ],
+        description="Hostname patterns blocked by web_browse / web_search "
+        "(Task 2.5). A leading '.' means suffix match; otherwise exact host "
+        "or subdomain of that label.",
+    )
 
     # --- Code tool boundaries ----------------------------------------------
     code_python_bin: str = Field(
@@ -106,7 +117,12 @@ class MCPSettings(BaseSettings):
         "and a marker is appended so the agent knows.",
     )
 
-    @field_validator("fs_read_roots", "fs_write_roots", mode="before")
+    @field_validator(
+        "fs_read_roots",
+        "fs_write_roots",
+        "web_blocked_host_suffixes",
+        mode="before",
+    )
     @classmethod
     def _split_csv(cls, v):
         if isinstance(v, str):

@@ -38,6 +38,14 @@ string code (e.g. `path_not_allowed`, `file_too_large`,
 deliberately does not — user home is read-only by default. To grant
 write access for a session, change `MCP_SERVER_FS_WRITE_ROOTS`.
 
+**Network (Task 2.5):** Outbound `httpx` calls honour `HTTP_PROXY` /
+`HTTPS_PROXY` / `NO_PROXY` from the environment (and optional
+`MCP_SERVER_WEB_PROXY_URL`). URLs with private IP literals are rejected;
+hostnames matching `MCP_SERVER_WEB_BLOCKED_HOST_SUFFIXES` (default
+includes `internal.gwdg.de`, `.internal`, `.local`, `.corp`) are
+rejected before connect. Blocked URLs are logged at WARNING with
+`mcp_url_blocked`.
+
 ## Run locally
 
 ```bash

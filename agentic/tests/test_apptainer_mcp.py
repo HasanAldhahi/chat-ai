@@ -166,16 +166,21 @@ def test_def_post_writes_image_info(def_text: str):
 # %environment                                                                #
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.parametrize(
-    "var", ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
-            "http_proxy", "https_proxy", "no_proxy"],
-)
-def test_def_environment_does_not_hardcode_proxy(def_text: str, var: str):
+
+def test_def_environment_defers_proxy_to_base(def_text: str):
+    """HTTP(S)_PROXY live on the base layer; mcp must not duplicate them."""
     env = _section(def_text, "%environment")
     assert env, "Apptainer.def has no %environment section"
-    assert not re.search(rf"^\s*export\s+{var}=", env, re.MULTILINE), (
-        f"%environment must not hardcode {var}; broker plumbs per-session."
-    )
+    assert "Task 2.5" in env, "%environment should reference Task 2.5 / base proxy"
+    assert not re.search(r"^\s*export\s+HTTP_PROXY=", env, re.MULTILINE)
+    assert not re.search(r"^\s*export\s+HTTPS_PROXY=", env, re.MULTILINE)
+    assert not re.search(r"^\s*export\s+NO_PROXY=", env, re.MULTILINE)
+
+
+@pytest.mark.parametrize("var", ["http_proxy", "https_proxy", "no_proxy"])
+def test_def_environment_no_lower_case_proxy(def_text: str, var: str):
+    env = _section(def_text, "%environment")
+    assert not re.search(rf"^\s*export\s+{var}=", env, re.MULTILINE)
 
 
 def test_def_environment_sets_pythonpath_and_locale(def_text: str):
