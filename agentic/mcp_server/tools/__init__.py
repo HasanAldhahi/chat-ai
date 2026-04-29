@@ -19,6 +19,7 @@ from typing import Any, Awaitable, Callable, Dict, List
 from . import code as code_tools
 from . import fs as fs_tools
 from . import web as web_tools
+from . import skills_tool
 
 
 ToolFn = Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]
@@ -161,6 +162,25 @@ TOOLS: List[Tool] = [
             "required": ["code"],
         },
         fn=code_tools.code_check,
+    ),
+    Tool(
+        name="get_skills",
+        description=(
+            "Return Markdown instruction snippets for the active agent "
+            "(Slurm, file policy, proxy egress, MCP JSON-RPC syntax). "
+            "Pass `framework` (openhands, goose, opencode) or rely on "
+            "`MCP_SERVER_AGENT_FRAMEWORK` from the launcher."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "framework": {
+                    "type": "string",
+                    "description": "Optional: openhands | goose | opencode (default: env)",
+                },
+            },
+        },
+        fn=skills_tool.get_skills,
     ),
 ]
 

@@ -25,8 +25,7 @@ This package currently implements:
   Chrome stable; recipe + build/test scripts + 51 structural pytest tests;
   `.sif` build deferred to operator)
 - **Task 2.2**: MCP Server (`agentic/mcp_server/` — JSON-RPC 2.0 over
-  HTTP, seven tools: `fs_read`/`fs_write`/`fs_list`/`web_search`/
-  `web_browse`/`code_exec`/`code_check`; derived Apptainer image at
+  HTTP, eight tools: `get_skills`, `fs_*`, `web_*`, `code_*`; derived Apptainer image at
   `agentic/containers/mcp/`; functional + structural pytest)
 - **Task 2.3**: OpenHands packaging (`agentic/openhands_runtime/` — launcher,
   SSE forwarder to the broker, config; derived Apptainer image at

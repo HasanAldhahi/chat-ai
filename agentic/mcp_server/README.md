@@ -33,6 +33,7 @@ string code (e.g. `path_not_allowed`, `file_too_large`,
 | `web_browse` | HTTP GET a URL                              | proxy; private IPs blocked       |
 | `code_exec`  | Run a Python snippet in a subprocess        | timeout ≤30 s; 64 KiB per stream |
 | `code_check` | Lint a snippet with pyflakes                | same timeout                     |
+| `get_skills` | Cluster Markdown hints (Slurm, paths, proxy, JSON-RPC) | `MCP_SERVER_SKILLS_DIR`, `MCP_SERVER_AGENT_FRAMEWORK` |
 
 `fs_read` / `fs_list` accept `/home/user` as well, but `fs_write`
 deliberately does not — user home is read-only by default. To grant
@@ -45,6 +46,11 @@ hostnames matching `MCP_SERVER_WEB_BLOCKED_HOST_SUFFIXES` (default
 includes `internal.gwdg.de`, `.internal`, `.local`, `.corp`) are
 rejected before connect. Blocked URLs are logged at WARNING with
 `mcp_url_blocked`.
+
+**Skills (Task 4.4):** Ship `*.md` files with YAML frontmatter under
+`MCP_SERVER_SKILLS_DIR` (default `/skills`). The `get_skills` tool filters by
+`framework` (argument) or `MCP_SERVER_AGENT_FRAMEWORK` (launcher default).
+Use `framework: "*"` in frontmatter for skills that apply to every agent.
 
 ## Run locally
 
@@ -89,6 +95,8 @@ ones you'll typically touch:
 | `MCP_SERVER_WEB_SEARCH_API_KEY`       | empty                                  | broker plumbs from Vault                    |
 | `MCP_SERVER_WEB_PROXY_URL`            | empty (uses env)                       | broker plumbs `APPTAINERENV_HTTPS_PROXY`    |
 | `MCP_SERVER_CODE_EXEC_MAX_TIMEOUT_S`  | `30`                                   | acceptance: 30 s                            |
+| `MCP_SERVER_SKILLS_DIR`                | `/skills`                             | `*.md` with YAML frontmatter; Task 4.4      |
+| `MCP_SERVER_AGENT_FRAMEWORK`           | empty                                  | default for `get_skills` without `framework` |
 
 ## Tests
 

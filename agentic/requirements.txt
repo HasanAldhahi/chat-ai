@@ -11,6 +11,9 @@ mcp>=1.8,<2
 # MCP server (Task 2.2): code_check uses pyflakes via subprocess
 pyflakes==3.2.0
 
+# Skills frontmatter (Task 4.4)
+PyYAML==6.0.2
+
 # Dev / test
 pytest==8.3.3
 pytest-asyncio==0.24.0

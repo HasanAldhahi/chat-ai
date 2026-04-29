@@ -2,8 +2,8 @@
 # test_image.sh — runtime smoke tests for the chat-ai MCP server image (Task 2.2).
 #
 # Exercises every Task 2.2 acceptance criterion: import graph clean,
-# /health responds 200, list_tools returns 7 tools, fs/web/code tools
-# round-trip via JSON-RPC, security boundaries enforced. Output is the
+# /health responds 200, list_tools returns 8 tools, fs/web/code tools
+# round-trip via JSON-RPC (incl. get_skills), security boundaries enforced. Output is the
 # same [ok]/[fail] format the base image's test_image.sh uses.
 #
 # Usage: test_image.sh <path-to-mcp.sif>
@@ -102,8 +102,8 @@ RPC="http://127.0.0.1:${PORT}/rpc"
 
 # ----- 2. /health -----
 HEALTH=$(curl -fsS "http://127.0.0.1:${PORT}/health")
-if printf '%s' "$HEALTH" | jq -e '.status == "healthy" and .tool_count == 7' >/dev/null; then
-    printf "[ok]   /health reports 7 tools healthy\n"
+if printf '%s' "$HEALTH" | jq -e '.status == "healthy" and .tool_count == 8' >/dev/null; then
+    printf "[ok]   /health reports 8 tools healthy\n"
     PASS=$((PASS + 1))
 else
     printf "[fail] /health unexpected response: %s\n" "$HEALTH"
@@ -113,7 +113,7 @@ fi
 # ----- 3. list_tools -----
 TOOLS=$(curl -fsS "$RPC" -H 'content-type: application/json' \
     -d '{"jsonrpc":"2.0","id":1,"method":"list_tools"}')
-EXPECTED_TOOLS="fs_read fs_write fs_list web_search web_browse code_exec code_check"
+EXPECTED_TOOLS="fs_read fs_write fs_list web_search web_browse code_exec code_check get_skills"
 for t in $EXPECTED_TOOLS; do
     if printf '%s' "$TOOLS" | jq -e --arg n "$t" '.result.tools[] | select(.name == $n)' >/dev/null; then
         printf "[ok]   list_tools includes %s\n" "$t"

@@ -103,8 +103,8 @@ apptainer run mcp.sif
 
 Exercises every Task 2.2 acceptance criterion:
 
-- /health responds 200 with `tool_count == 7`
-- `list_tools` returns all seven tool names
+- /health responds 200 with `tool_count == 8` (incl. `get_skills`)
+- `list_tools` returns all eight tool names
 - `fs_read /etc/passwd` blocked with `path_not_allowed`
 - `fs_write` then `fs_read` round-trip on `/workspace`
 - `web_browse http://127.0.0.1` blocked with `url_blocked`

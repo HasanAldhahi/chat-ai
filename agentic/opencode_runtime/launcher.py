@@ -118,6 +118,8 @@ async def run(settings: Optional[cfg_module.OpenCodeSettings] = None) -> int:
     cfg_path = write_opencode_config(home=home, settings=settings)
     log.info("opencode.config.written", extra={"path": str(cfg_path)})
 
+    os.environ.setdefault("MCP_SERVER_AGENT_FRAMEWORK", "opencode")
+
     port = settings.mcp_uvicorn_port
     health_url = f"http://127.0.0.1:{port}/health"
 

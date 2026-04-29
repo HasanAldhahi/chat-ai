@@ -56,7 +56,9 @@ def test_health_ok(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "healthy"
-    assert body["tool_count"] == 7
+    assert body["tool_count"] == 8
+    assert "skill_count" in body
+    assert isinstance(body["skill_count"], int)
 
 
 # --------------------------------------------------------------------------- #
@@ -122,10 +124,11 @@ EXPECTED_TOOLS = {
     "web_browse",
     "code_exec",
     "code_check",
+    "get_skills",
 }
 
 
-def test_list_tools_returns_seven_tools(client):
+def test_list_tools_returns_eight_tools(client):
     r = _rpc(client, {"jsonrpc": "2.0", "id": 1, "method": "list_tools"})
     tools = r.json()["result"]["tools"]
     assert {t["name"] for t in tools} == EXPECTED_TOOLS

@@ -123,6 +123,7 @@ def test_def_files_copies_mcp_server(def_text: str):
     assert "requirements.txt" in files, (
         "%files must copy requirements.txt so %post can pip install"
     )
+    assert "../../skills /skills" in files, "%files must bundle skills under /skills"
 
 
 # --------------------------------------------------------------------------- #
@@ -138,6 +139,7 @@ REQUIRED_POST_TOKENS = (
     "pip install",
     # Sanity import check — fails the build if mcp_server doesn't import.
     "import mcp_server",
+    "load_skill_store",
     # Strict shell.
     "set -eux",
 )

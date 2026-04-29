@@ -32,6 +32,7 @@ Stage: build
     # so it doesn't shadow anything under /usr/local.
     ../../mcp_server /opt/agentic/mcp_server
     ../../requirements.txt /opt/agentic/requirements.txt
+    ../../skills /skills
 
 %post
     set -eux
@@ -51,8 +52,8 @@ Stage: build
     python3.11 -m pip install --no-cache-dir pyflakes==3.2.0
 
     # ----- 2. Sanity check the imports happen before the image is sealed.
-    python3.11 -c "import mcp_server.main; import mcp_server.tools" \
-        || { echo "mcp_server import failed"; exit 1; }
+    python3.11 -c "import mcp_server.main; import mcp_server.tools; import mcp_server.skills.loader as sl; assert len(sl.load_skill_store('/skills', reload=True).docs) >= 1" \
+        || { echo "mcp_server skills import failed"; exit 1; }
     python3.11 -m pyflakes --version || true
 
     # ----- 3. Build metadata (overwrite base's stamp with this image's) ---

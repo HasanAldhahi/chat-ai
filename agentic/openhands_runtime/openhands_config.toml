@@ -47,6 +47,10 @@ url = "${MCP_SERVER_URL}"
 transport = "http"
 endpoint = "/rpc"
 
+# Before heavy Slurm or egress work, fetch Markdown snippets via MCP:
+# call_tool name=get_skills with arguments {\"framework\":\"openhands\"}
+# (launcher exports MCP_SERVER_AGENT_FRAMEWORK so omitting `framework` works too).
+
 [telemetry]
 # Structured stdout — the launcher tails this and forwards each
 # line to the broker's SSE hub via translate_openhands_line().

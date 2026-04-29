@@ -114,6 +114,8 @@ async def run(settings: Optional[cfg_module.GooseSettings] = None) -> int:
     cfg_path = write_goose_config(home=Path(settings.home_dir), rpc_url=rpc_url)
     log.info("goose.config.written", extra={"path": str(cfg_path)})
 
+    os.environ.setdefault("MCP_SERVER_AGENT_FRAMEWORK", "goose")
+
     health_url = f"http://127.0.0.1:{port}/health"
 
     mcp = await _start_mcp(port)

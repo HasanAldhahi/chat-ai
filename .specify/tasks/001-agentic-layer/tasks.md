@@ -944,7 +944,7 @@ Package the sst/opencode framework inside the Apptainer container with MCP suppo
 ---
 
 ### Task 4.4: Agent Skills Framework
-**Status:** 🟡 IN PROGRESS
+**Status:** 🟢 COMPLETE (loader + image + tests; agent must call `get_skills` for text)
 **Priority:** MEDIUM
 **Est. Effort:** 4-5 days
 **Assignee:** TBD
@@ -991,7 +991,18 @@ Implement the Agent Skills system, which loads Markdown instruction files (SKILL
 - Code reviewed and merged
 - Document skill format and how to add custom skills
 
-**🟡 Partial (2026-04-29):** Planning doc `agentic/docs/SKILLS_FRAMEWORK.md`. MCP `get_skills()` loader, frontmatter validation, and bundled `SKILL.md` files — TODO.
+**✅ Implementation note (2026-04-29):**
+- **`mcp_server/skills/loader.py`**: YAML frontmatter via **PyYAML**, path-keyed process cache, **`framework` / `frameworks` / `*`** matching.
+- **`MCP_SERVER_SKILLS_DIR`** (default **`/skills`**), **`MCP_SERVER_AGENT_FRAMEWORK`**; **`get_skills`** MCP tool in **`mcp_server/tools/skills_tool.py`** (uses **`cfg_module.get_settings()`** so tests can patch settings).
+- **Bundled Markdown:** `agentic/skills/` → **`gwdg_slurm_scripts.md`**, **`file_permissions.md`**, **`web_proxy_usage.md`**, **`tool_syntax.md`**.
+- **`containers/mcp/Apptainer.def`**: **`../../skills /skills`**, build-time import check of **`load_skill_store('/skills')`**.
+- **Launchers:** **`MCP_SERVER_AGENT_FRAMEWORK`** **`setdefault`** — **`openhands`** / **`goose`** / **`opencode`** in respective **`launcher.py`** before spawning uvicorn.
+- **`openhands_runtime/openhands_config.toml`**: commented hint to call **`get_skills`** for Slurm-heavy work.
+- **Tests:** **`test_skills_loader.py`**, **`test_mcp_get_skills.py`**, **`test_mcp_server` / `test_apptainer_mcp` / `test_image.sh`** updated for eight tools + **`skill_count`**.
+
+**Branch stack:** **`task-4.4-agent-skills-framework`** from **`task-4.3-sst-opencode-packaging`**.
+
+**🟡 Partial (2026-04-29):** — superseded by implementation above.
 
 ---
 
