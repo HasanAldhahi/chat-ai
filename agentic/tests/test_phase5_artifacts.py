@@ -56,3 +56,19 @@ def test_performance_report_template_exists():
 def test_locustfile_exists():
     p = REPO / "agentic" / "perf" / "locustfile.py"
     assert p.is_file(), "perf/locustfile.py must exist for Task 5.3 load campaigns"
+
+
+def test_uat_plan_doc_exists():
+    p = REPO / "agentic" / "docs" / "UAT_PLAN.md"
+    assert p.is_file(), "UAT_PLAN.md must exist for Task 5.4 traceability"
+
+
+def test_uat_report_template_exists():
+    p = (
+        REPO
+        / ".specify"
+        / "tasks"
+        / "001-agentic-layer"
+        / "UAT_REPORT.md"
+    )
+    assert p.is_file(), "UAT_REPORT.md must exist for Task 5.4 traceability"

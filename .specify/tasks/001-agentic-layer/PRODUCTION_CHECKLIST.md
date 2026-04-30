@@ -26,7 +26,16 @@ is environment-specific.
 - [ ] vLLM latency SLO
 
 ## 5.4 UAT
-- [ ] Pilot user cohort sign-off
+- [ ] Confirm `agent_chat_started` / `agent_chat_failed_5xx` audit events are emitted (prerequisite — see `agentic/docs/UAT_PLAN.md` § 6.1)
+- [ ] Beta environment deployed on GWDG with isolated Vault namespace + vLLM endpoint (`UAT_PLAN.md` § 3)
+- [ ] Recruit 10–20 cohort across researcher / student / admin / external personas (`UAT_PLAN.md` § 2)
+- [ ] Run live onboarding session, recording archived (`UAT_PLAN.md` § 4)
+- [ ] Two-week active-usage window observed; redeploys logged in `UAT_REPORT.md` § 2
+- [ ] Surveys returned ≥ 70 % response rate; NPS computed (`UAT_PLAN.md` § 5)
+- [ ] Post-cohort interviews completed with 5–7 participants (`UAT_PLAN.md` § 5.3)
+- [ ] `UAT_REPORT.md` § 1 scoreboard ≥ 6 of 7 rows at-or-above target
+- [ ] Top-5 issues filed as GitHub issues with owner + target version (`UAT_REPORT.md` § 4)
+- [ ] PM + engineering lead countersign in `UAT_REPORT.md` § 8
 
 ## 5.5 Production readiness
 - [ ] Runbooks, on-call, rollback drill

@@ -1268,10 +1268,19 @@ Perform load testing to verify the system can handle 100+ concurrent users and m
 ---
 
 ### Task 5.4: User Acceptance Testing (UAT)
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS — planning artifacts landed; cohort execution is operator-driven
 **Priority:** HIGH
 **Est. Effort:** 2-3 weeks
 **Assignee:** TBD (product manager + users)
+
+**Implementation notes (in-repo deliverables, branch `task-5.4-uat`):**
+- **`agentic/docs/UAT_PLAN.md`** — operator runbook covering: acceptance scoreboard, two-week cohort timeline, recruitment mix (researchers / students / admins / external), beta-env isolation rules, onboarding script, three-channel feedback design (in-app micro-survey, mid-cohort email, post-cohort interview), metric capture (audit-log queries for activation / engagement / reliability), severity-based issue triage, sign-off gate, and operator follow-ups.
+- **`.specify/tasks/001-agentic-layer/UAT_REPORT.md`** — per-cohort fill-in template: scoreboard, cohort metadata, activation funnel, engagement / reliability metrics, performance cross-check vs Task 5.3, top-5-issue table, interview prompts, theme synthesis, UAT-only divergence log (`D-XXX` format), testimonials, dual sign-off line.
+- **`PRODUCTION_CHECKLIST.md`** § 5.4 expanded from one bullet to a runbook-aligned checklist.
+- **`agentic/tests/test_phase5_artifacts.py`** gains tripwires for `UAT_PLAN.md` and `UAT_REPORT.md`.
+- **Remainder** (operator-driven, intentionally not in repo): beta deploy on GWDG cluster, participant recruitment, live onboarding session, two-week usage window, survey distribution, post-cohort interviews, scoreboard fill-in, GitHub issue creation per top-5 finding, dual sign-off. Several **prerequisites** are noted in the runbook as operator follow-ups: in-app `/api/agent/feedback` endpoint, `AGENTIC_BETA_BANNER` flag, audit-log emission of `agent_chat_started` / `agent_chat_failed_5xx` (gate before cohort opens).
+
+**Branch stack:** **`task-5.4-uat`** from **`task-5.3-performance-testing`**.
 
 **Description:**
 Deploy to beta test environment and gather feedback from 10-20 real users to validate UX, performance, and reliability.
@@ -1379,8 +1388,8 @@ Prepare system for production launch by setting up monitoring, runbooks, documen
   - MEDIUM: 7
   - LOW: 4
 - **Tasks by Status:**
-  - 🔴 TODO: 16
-  - 🟡 IN PROGRESS: 3
+  - 🔴 TODO: 15
+  - 🟡 IN PROGRESS: 4
   - 🟢 DONE: 12
   - 🔵 BLOCKED: 0
 - **Estimated Total Effort:** 100-135 person-days
