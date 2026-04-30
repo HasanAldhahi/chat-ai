@@ -4,8 +4,11 @@ Derived from `tasks.md` Tasks 5.1–5.5. This file is a **planning aid**; execut
 is environment-specific.
 
 ## 5.1 Security / pentest
+- [ ] Run `pytest agentic/tests/security/ -m security` (automated regression suite — see `task-5.1-security-pentest`)
+- [ ] Walk through every row in `SECURITY_PENTEST_REPORT.md` for the deployed environment
 - [ ] Third-party penetration test on broker + MCP boundary
 - [ ] Review Slurm job env injection and Vault paths
+- [ ] Pentester sign-off recorded in `SECURITY_PENTEST_REPORT.md` § 7
 
 ## 5.2 End-to-end
 - [ ] Chat UI → Node → broker → vLLM smoke (agent model)

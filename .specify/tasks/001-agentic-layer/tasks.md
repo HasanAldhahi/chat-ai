@@ -1055,7 +1055,7 @@ Update the React frontend to allow users to select from multiple agent framework
 **📋 Planning (2026-04-29):** Operator-facing execution checklists for Tasks 5.1–5.5 are in `.specify/tasks/001-agentic-layer/PRODUCTION_CHECKLIST.md`. Traceability test: `agentic/tests/test_phase5_artifacts.py`.
 
 ### Task 5.1: Security Penetration Testing
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS (automated regression suite landed; manual / external-team pentest outstanding)
 **Priority:** HIGH
 **Est. Effort:** 5-7 days
 **Assignee:** TBD (or external security team)
@@ -1110,6 +1110,20 @@ Conduct comprehensive security penetration testing to identify vulnerabilities i
 - Code reviewed by security team
 - Document security best practices for users
 - Add security tests to CI/CD pipeline
+
+**🟡 Implementation note (2026-04-30):**
+- **Automated regression suite** at `agentic/tests/security/` (run with `pytest agentic/tests/security/ -m security`):
+  - `test_fs_containment.py` — sensitive absolute paths, traversal, symlink-escape on read **and** write, NUL bytes, read-only-root enforcement.
+  - `test_url_containment.py` — RFC1918 / loopback / link-local / IPv6 ULA / cloud-metadata IPs, GWDG hostname suffix list, non-http(s) schemes, bad input types.
+  - `test_secret_handling.py` — secret-value-in-logs scanner, per-user Vault path scoping, hostile X-User shapes blocked before any Vault round-trip, blocked-URL log tripwire.
+  - `test_session_isolation.py` — cross-user 403 on Slurm job status / cancel and on SSE publish / subscribe.
+  - `test_code_exec_sandbox.py` — `code_exec` timeout enforcement, oversize / negative timeout rejection, `python -I` isolation flag.
+  - `conftest.py` auto-applies `@pytest.mark.security` to the entire package so the suite is callable as a single CI gate.
+- **Operator pentest report** at `.specify/tasks/001-agentic-layer/SECURITY_PENTEST_REPORT.md` — per-bullet template (file system, network, container, secrets, session isolation) mapping each Task 5.1 acceptance row to either the automated test or a manual procedure; § 6 findings format and § 7 sign-off list.
+- **`PRODUCTION_CHECKLIST.md` § 5.1** updated to point at both artifacts.
+- **Remainder** (operator-driven): real cluster manual exercises, third-party / GWDG security team engagement, Apptainer + bubblewrap break-out attempts, DNS-rebinding probe, capture of egress traffic to confirm WWW-Cache enforcement, and `SECURITY_PENTEST_REPORT.md` § 7 sign-off.
+
+**Branch stack:** **`task-5.1-security-pentest`** from **`task-4.5-multi-agent-selection-ui`** (Task 4.2 skipped earlier in the stack).
 
 ---
 
@@ -1323,8 +1337,8 @@ Prepare system for production launch by setting up monitoring, runbooks, documen
   - MEDIUM: 7
   - LOW: 4
 - **Tasks by Status:**
-  - 🔴 TODO: 19
-  - 🟡 IN PROGRESS: 0
+  - 🔴 TODO: 18
+  - 🟡 IN PROGRESS: 1
   - 🟢 DONE: 12
   - 🔵 BLOCKED: 0
 - **Estimated Total Effort:** 100-135 person-days
