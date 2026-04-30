@@ -117,17 +117,6 @@ class MCPSettings(BaseSettings):
         "and a marker is appended so the agent knows.",
     )
 
-    # --- Agent skills (Task 4.4) --------------------------------------------
-    skills_dir: str = Field(
-        default="/skills",
-        description="Directory of Markdown SKILL files (flat *.md) with YAML frontmatter.",
-    )
-    agent_framework: str = Field(
-        default="",
-        description="Default agent id for get_skills when the tool omits `framework` "
-        "(openhands, goose, opencode, …). Lowercase.",
-    )
-
     @field_validator(
         "fs_read_roots",
         "fs_write_roots",

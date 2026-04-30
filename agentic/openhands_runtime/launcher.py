@@ -204,8 +204,6 @@ async def run(settings: Optional[config.OpenHandsSettings] = None) -> int:
         },
     )
 
-    os.environ.setdefault("MCP_SERVER_AGENT_FRAMEWORK", "openhands")
-
     mcp = await _start_mcp_server(settings)
     health_url = settings.mcp_server_url.rstrip("/") + "/health"
     healthy = await wait_for_health(

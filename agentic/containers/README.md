@@ -24,7 +24,7 @@ broker (FastAPI)
 | [`sandbox/`](sandbox/)   | 2.4 | bubblewrap + Chrome wrapper sources (copied into base `.sif`) | done |
 | [`goose/`](goose/)      | 4.1 | Goose agent (AAIF CLI) + MCP stack | recipe + build scripts (integration TBD) |
 | `smolagents/`           | 4.2 | Hugging Face smolagents | TBD |
-| [`opencode/`](opencode/) | 4.3 | OpenCode CLI (`sst/opencode`) + stdio MCP bridge + MCP HTTP | recipe + scripts |
+| `opencode/`             | 4.3 | sst/opencode | TBD |
 
 ## Build order
 
@@ -37,7 +37,6 @@ cd agentic/containers/base       && ./build_image.sh --fakeroot --force
 cd ../mcp                        && ./build_image.sh --fakeroot --force   # once it exists
 cd ../openhands                  && ./build_image.sh --fakeroot --force   # Task 2.3
 cd ../goose                       && ./build_image.sh --fakeroot --force   # Task 4.1 (requires mcp.sif)
-cd ../opencode                   && ./build_image.sh --fakeroot --force   # Task 4.3 (requires mcp.sif)
 ```
 
 ## Conventions

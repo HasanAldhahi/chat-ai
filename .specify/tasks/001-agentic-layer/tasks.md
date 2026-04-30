@@ -900,7 +900,7 @@ Package the Hugging Face smolagents framework inside the Apptainer container wit
 ---
 
 ### Task 4.3: sst/opencode Packaging
-**Status:** 🟢 COMPLETE (implementation; cluster E2E with real LLM = ops)
+**Status:** 🟡 IN PROGRESS
 **Priority:** LOW
 **Est. Effort:** 2-3 days
 **Assignee:** TBD
@@ -930,21 +930,12 @@ Package the sst/opencode framework inside the Apptainer container with MCP suppo
 - Document configuration
 - Code reviewed and merged
 
-**✅ Implementation note (2026-04-29):**
-- **`opencode_runtime/`**: **`launcher`** (MCP uvicorn → **`/health`** → writes **`~/.config/opencode/opencode.json`** → **`opencode run …`** + **`openhands_runtime.sse_forwarder`** toward broker SSE), **`mcp_stdio_gateway`** (OpenCode **`type: local`** stdio MCP → **`POST …/rpc`** JSON-RPC **`list_tools` / `call_tool`**).
-- **Deps:** **`mcp` (PyPI)** in **`agentic/requirements.txt`** (stdio MCP server primitives).
-- **Image:** `containers/opencode/Apptainer.def` installs **OpenCode** from **`anomalyco/opencode` release tarball**, copies **`opencode_runtime/`**; **`entrypoint.sh`** → **`python3.11 -m opencode_runtime.launcher`**.
-- **Tests:** `tests/test_opencode_config.py`, `tests/test_opencode_mcp_stdio_gateway.py`, **`test_apptainer_opencode`** (static recipe); full **`pytest`** passes.
-- **Smoke:** `OPENCODE_DEV_COMMAND_OVERRIDE=/bin/true` bypasses the real OpenCode binary (like Goose); production needs **`OPENAI_API_KEY`**, **`OPENAI_BASE_URL`**, and **`OPENCODE_MODEL`** (or override config) for the cluster LLM.
-
-**Branch stack:** **`task-4.3-sst-opencode-packaging`** from **`task-4.1-goose-agent-packaging`** (Task 4.2 skipped).
-
-**🟡 Scaffold (2026-04-29):** — superseded by implementation above.
+**🟡 Scaffold (2026-04-29):** `agentic/containers/opencode/README.md`; full image — TODO.
 
 ---
 
 ### Task 4.4: Agent Skills Framework
-**Status:** 🟢 COMPLETE (loader + image + tests; agent must call `get_skills` for text)
+**Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 4-5 days
 **Assignee:** TBD
@@ -991,23 +982,12 @@ Implement the Agent Skills system, which loads Markdown instruction files (SKILL
 - Code reviewed and merged
 - Document skill format and how to add custom skills
 
-**✅ Implementation note (2026-04-29):**
-- **`mcp_server/skills/loader.py`**: YAML frontmatter via **PyYAML**, path-keyed process cache, **`framework` / `frameworks` / `*`** matching.
-- **`MCP_SERVER_SKILLS_DIR`** (default **`/skills`**), **`MCP_SERVER_AGENT_FRAMEWORK`**; **`get_skills`** MCP tool in **`mcp_server/tools/skills_tool.py`** (uses **`cfg_module.get_settings()`** so tests can patch settings).
-- **Bundled Markdown:** `agentic/skills/` → **`gwdg_slurm_scripts.md`**, **`file_permissions.md`**, **`web_proxy_usage.md`**, **`tool_syntax.md`**.
-- **`containers/mcp/Apptainer.def`**: **`../../skills /skills`**, build-time import check of **`load_skill_store('/skills')`**.
-- **Launchers:** **`MCP_SERVER_AGENT_FRAMEWORK`** **`setdefault`** — **`openhands`** / **`goose`** / **`opencode`** in respective **`launcher.py`** before spawning uvicorn.
-- **`openhands_runtime/openhands_config.toml`**: commented hint to call **`get_skills`** for Slurm-heavy work.
-- **Tests:** **`test_skills_loader.py`**, **`test_mcp_get_skills.py`**, **`test_mcp_server` / `test_apptainer_mcp` / `test_image.sh`** updated for eight tools + **`skill_count`**.
-
-**Branch stack:** **`task-4.4-agent-skills-framework`** from **`task-4.3-sst-opencode-packaging`**.
-
-**🟡 Partial (2026-04-29):** — superseded by implementation above.
+**🟡 Partial (2026-04-29):** Planning doc `agentic/docs/SKILLS_FRAMEWORK.md`. MCP `get_skills()` loader, frontmatter validation, and bundled `SKILL.md` files — TODO.
 
 ---
 
 ### Task 4.5: Multi-Agent Selection UI
-**Status:** 🟢 COMPLETE
+**Status:** 🟡 IN PROGRESS
 **Priority:** MEDIUM
 **Est. Effort:** 1-2 days
 **Assignee:** TBD
@@ -1040,13 +1020,7 @@ Update the React frontend to allow users to select from multiple agent framework
 - Code reviewed and merged
 - Update documentation with agent descriptions
 
-**✅ Implementation note (2026-04-29):**
-- **`chatAiAgentModels.js`**: four agents with stable **`CHAT_AI_AGENT_ID_*`**; per-agent **`description`** (extended selector); **`chatAiAgentTooltipI18nSuffix`** → **`model_selector.agent_*_tooltip`**.
-- **i18n** `en.js` / `de.js`: **`agent_openhands_tooltip`**, **`agent_goose_tooltip`**, **`agent_smolagents_tooltip`**, **`agent_opencode_tooltip`** (+ generic **`agent_tooltip`** fallback).
-- **`ModelSelectorSimple` / `ModelSelectorExtended`**: tooltips on dropdown rows, grid, and trigger; **`ModelSelectorWrapper`**: clearing conversation when switching **chat↔agent** or **between agents** (different `model.id`).
-- **Persistence**: unchanged — **`redux-persist`** `last_conversation` / **`user_settings`** (selected model travels with conversation state).
-
-**Branch stack:** **`task-4.5-multi-agent-selection-ui`** from **`task-4.4-agent-skills-framework`**.
+**🟡 Partial (2026-04-29):** Three agents in dropdown + tooltips; **fourth** (smolagents) omitted with Task 4.2. Backend receives agent model id via existing chat payload.
 
 ---
 

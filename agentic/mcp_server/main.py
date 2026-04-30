@@ -44,17 +44,13 @@ def create_app(settings: MCPSettings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        from .skills.loader import load_skill_store, reset_skill_cache
         from .tools import TOOLS
 
-        reset_skill_cache()
-        st = load_skill_store(settings.skills_dir, reload=False)
         log.info(
             "mcp_server starting",
             extra={
                 "version": __version__,
                 "tool_count": len(TOOLS),
-                "skill_count": len(st.docs),
                 "fs_read_roots": settings.fs_read_roots,
                 "fs_write_roots": settings.fs_write_roots,
             },
@@ -74,15 +70,12 @@ def create_app(settings: MCPSettings | None = None) -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict:
-        from .skills.loader import load_skill_store
         from .tools import TOOLS
 
-        st = load_skill_store(settings.skills_dir)
         return {
             "status": "healthy",
             "version": __version__,
             "tool_count": len(TOOLS),
-            "skill_count": len(st.docs),
         }
 
     @app.post("/rpc")
