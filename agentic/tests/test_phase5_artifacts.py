@@ -72,3 +72,34 @@ def test_uat_report_template_exists():
         / "UAT_REPORT.md"
     )
     assert p.is_file(), "UAT_REPORT.md must exist for Task 5.4 traceability"
+
+
+# Task 5.5 Production Readiness -------------------------------------------------------------------
+def test_runbook_slurm_exist():
+    p = REPO / "agentic" / "docs" / "runbook-slurm-job-failures.md"
+    assert p.is_file(), "runbook-slurm-job-failures.md must exist for Task 5.5"
+
+
+def test_runbook_broker_exist():
+    p = REPO / "agentic" / "docs" / "runbook-broker-downtime.md"
+    assert p.is_file(), "runbook-broker-downtime.md must exist for Task 5.5"
+
+
+def test_runbook_vault_exist():
+    p = REPO / "agentic" / "docs" / "runbook-vault-unavailability.md"
+    assert p.is_file(), "runbook-vault-unavailability.md must exist for Task 5.5"
+
+
+def test_runbook_security_exist():
+    p = REPO / "agentic" / "docs" / "runbook-security-incident-response.md"
+    assert p.is_file(), "runbook-security-incident-response.md must exist for Task 5.5"
+
+
+def test_prometheus_middleware_exist():
+    p = REPO / "agentic" / "app" / "middleware" / "prometheus.py"
+    assert p.is_file(), "prometheus.py middleware must exist for Task 5.5"
+
+
+def test_metrics_endpoint_exist():
+    p = REPO / "agentic" / "app" / "routers" / "metrics.py"
+    assert p.is_file(), "metrics.py router must exist for Task 5.5"

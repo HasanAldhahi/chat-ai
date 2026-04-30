@@ -14,7 +14,8 @@ from app import __version__
 from app.config import Settings, get_settings
 from app.logging_config import configure_logging
 from app.middleware.auth import AuthMiddleware
-from app.routers import agent_chat, feedback, features, health, jobs, secrets, sse
+from app.routers import agent_chat, feedback, features, health, jobs, secrets, sse, metrics
+from app.middleware.prometheus import PrometheusMiddleware
 from app.services.auth import AuthService
 
 
@@ -64,6 +65,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expose_headers=["X-Request-ID"],
     )
 
+    # Add Prometheus metrics middleware
+    app.add_middleware(PrometheusMiddleware)
+
     if settings.auth_middleware_enabled:
         auth_service = AuthService(
             validate_format=settings.auth_validate_format,
@@ -105,6 +109,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(agent_chat.router)
     app.include_router(feedback.router)
     app.include_router(features.router)
+    app.include_router(metrics.router)
     return app
 
 

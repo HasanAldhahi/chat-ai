@@ -38,5 +38,27 @@ is environment-specific.
 - [ ] PM + engineering lead countersign in `UAT_REPORT.md` § 8
 
 ## 5.5 Production readiness
-- [ ] Runbooks, on-call, rollback drill
-- [ ] Monitoring dashboards for broker + inference
+- [ ] Runbooks documented and reviewed:
+  - [ ] Slurm job failures (`runbook-slurm-job-failures.md`)
+  - [ ] FastAPI broker downtime (`runbook-broker-downtime.md`)
+  - [ ] Vault unavailability (`runbook-vault-unavailability.md`)
+  - [ ] Security incident response (`runbook-security-incident-response.md`)
+- [ ] Monitoring dashboards for broker + inference:
+  - [ ] Grafana dashboard created with CPU, memory, latency, error rates, active sessions
+  - [ ] Prometheus metrics configured (`/metrics` endpoint exposed)
+  - [ ] Alerting rules configured (PagerDuty/Slack notifications enabled)
+- [ ] Documentation updated and published:
+  - [ ] User guide published in GWDG knowledge base
+  - [ ] Admin guide published for internal team
+  - [ ] API documentation updated and verified
+- [ ] Final security review completed:
+  - [ ] All security fixes reviewed
+  - [ ] Compliance with GWDG policies verified
+  - [ ] Audit logs reviewed (UAT metrics)
+- [ ] Incident response drill completed:
+  - [ ] Simulated outage performed
+  - [ ] Team response practice completed
+- [ ] Rollback plan tested:
+  - [ ] Procedure to revert to previous version documented
+  - [ ] Rollback tested in staging
+- [ ] Production deployment checklist approved and launch date scheduled
