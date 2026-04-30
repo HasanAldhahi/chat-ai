@@ -18,6 +18,10 @@ is environment-specific.
 - [ ] Slurm job → Apptainer → MCP + agent smoke on cluster
 
 ## 5.3 Performance
+- [ ] Run `pytest agentic/tests/perf/ -m perf` (advisory micro-bench tripwires — see `task-5.3-performance-testing`)
+- [ ] Run the Locust campaign per `agentic/docs/PERFORMANCE_TESTING.md` § 2 and record results in `PERFORMANCE_REPORT.md`
+- [ ] Two consecutive 100-user campaigns meet every target row (P99 first action < 5 s, SSE P95 < 500 ms, CPU < 50 %, RSS Δ < 100 MB)
+- [ ] Add `prometheus_fastapi_instrumentator` + Grafana dashboards (`PERFORMANCE_TESTING.md` § 5)
 - [ ] Broker SSE load sample (target 100 msg/s per session cap)
 - [ ] vLLM latency SLO
 

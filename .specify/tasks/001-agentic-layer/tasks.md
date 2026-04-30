@@ -1,3 +1,4 @@
+
 # Tasks: Agentic Layer for Chat AI
 
 ## Overview
@@ -1194,7 +1195,7 @@ Write and execute end-to-end tests covering all user stories from the specificat
 ---
 
 ### Task 5.3: Performance Testing
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS (Locust scenarios + in-process micro-benchmarks landed; live load campaign + Grafana/Prometheus dashboards operator-driven)
 **Priority:** HIGH
 **Est. Effort:** 4-5 days
 **Assignee:** TBD
@@ -1242,6 +1243,27 @@ Perform load testing to verify the system can handle 100+ concurrent users and m
 - Bottlenecks optimized
 - Code reviewed and merged
 - Document scaling recommendations
+
+**🟡 Implementation note (2026-04-30):**
+- **Locust load campaign** at `agentic/perf/locustfile.py` + `agentic/perf/README.md`:
+  - One `AgenticBrokerUser` with weighted task mix (8x status poll, 6x SSE publish, 3x job submit, 2x secrets read, 1x agent_chat stream, 1x health) — matches the steady-state shape of a real session.
+  - Each Locust user gets a unique `X-User`/`session_id` so per-user rate limits don't collapse the traffic.
+  - 429 responses on SSE publish are recorded as success (expected at saturation), 5xx as failure. `agent_chat` uses `stream=True` and reads a small prefix so Locust records TTFB.
+  - Default invocation: `--users 100 --spawn-rate 10 --run-time 5m --headless --csv reports/<ts>` against a mock-mode broker.
+- **In-process micro-benchmark suite** at `agentic/tests/perf/` (auto-tagged `@pytest.mark.perf`, advisory):
+  - `test_sse_hub_perf.py` — publish→subscribe < 50 ms, broadcast-to-50 < 50 ms, 1000-msg round-trip < 2 s.
+  - `test_mcp_dispatch_perf.py` — `tools/list` mean < 5 ms, method-not-found < 1 ms, 200 concurrent dispatches < 1 s.
+  - `test_auth_rate_limit_perf.py` — `touch_and_check` mean < 50 µs, 200 users × 10 ops < 500 ms, header parse < 10 µs.
+  - `test_secret_cache_perf.py` — 1 miss + 999 hits → 1 Vault call (>99 % reduction); 50 concurrent first hits collapse to 1 Vault call; cache hit mean < 5 µs.
+  - **12 tests, ~0.5 s; all green.** Bounds are wide so a busy CI runner won't flake. Combined with security + e2e: 123 tests under the three perf-related markers.
+- **Operator artifacts:**
+  - `agentic/docs/PERFORMANCE_TESTING.md` — full runbook: targets table, Locust boot, resource-log script (`ps`-based fallback for absent Grafana), in-process suite usage, bottleneck triage cheat-sheet, monitoring follow-up scope.
+  - `.specify/tasks/001-agentic-layer/PERFORMANCE_REPORT.md` — per-campaign template: Run-summary table (P99 / P95 / CPU / RSS / errors), bottleneck format `B-XXX`, sustained-load notes, sign-off list.
+  - `PRODUCTION_CHECKLIST.md` § 5.3 updated to point at runbook, report, and the Prometheus follow-up.
+- **`pytest.ini`** registers the `perf` marker.
+- **Remainder** (operator-driven): live Locust campaign on a deployable broker (mock-mode broker baseline + real-vLLM run); Slurm-queue-backlog measurements (cluster-only); `prometheus_fastapi_instrumentator` integration + Grafana dashboards; sustained-load (30-min) leak hunt; second pass after optimisations to confirm targets.
+
+**Branch stack:** **`task-5.3-performance-testing`** from **`task-5.2-end-to-end-testing`**.
 
 ---
 
@@ -1357,8 +1379,8 @@ Prepare system for production launch by setting up monitoring, runbooks, documen
   - MEDIUM: 7
   - LOW: 4
 - **Tasks by Status:**
-  - 🔴 TODO: 17
-  - 🟡 IN PROGRESS: 2
+  - 🔴 TODO: 16
+  - 🟡 IN PROGRESS: 3
   - 🟢 DONE: 12
   - 🔵 BLOCKED: 0
 - **Estimated Total Effort:** 100-135 person-days

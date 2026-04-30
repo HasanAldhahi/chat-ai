@@ -35,3 +35,24 @@ def test_security_pentest_report_exists():
 def test_e2e_testing_doc_exists():
     p = REPO / "agentic" / "docs" / "E2E_TESTING.md"
     assert p.is_file(), "E2E_TESTING.md must exist for Task 5.2 traceability"
+
+
+def test_performance_testing_doc_exists():
+    p = REPO / "agentic" / "docs" / "PERFORMANCE_TESTING.md"
+    assert p.is_file(), "PERFORMANCE_TESTING.md must exist for Task 5.3 traceability"
+
+
+def test_performance_report_template_exists():
+    p = (
+        REPO
+        / ".specify"
+        / "tasks"
+        / "001-agentic-layer"
+        / "PERFORMANCE_REPORT.md"
+    )
+    assert p.is_file(), "PERFORMANCE_REPORT.md must exist for Task 5.3 traceability"
+
+
+def test_locustfile_exists():
+    p = REPO / "agentic" / "perf" / "locustfile.py"
+    assert p.is_file(), "perf/locustfile.py must exist for Task 5.3 load campaigns"
