@@ -218,6 +218,7 @@ class Settings(BaseSettings):
             "/redoc",
             "/docs/oauth2-redirect",
             "/api/vllm/health",
+            "/api/agent/config/features",
         ],
         description="HTTP paths the middleware should ignore "
         "(infrastructure / docs).",

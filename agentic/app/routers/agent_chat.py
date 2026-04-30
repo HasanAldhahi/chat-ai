@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from app.clients import vllm as vllm_client
 from app.config import Settings, get_settings
 from app.models.agent_chat import AgentChatRequest
+from app.services.audit_logger import log_agent_chat_failed_5xx, log_agent_chat_started
 
 router = APIRouter(tags=["agent-chat"])
 log = logging.getLogger("agentic.agent_chat")
@@ -35,7 +36,7 @@ async def agent_chat(
     execute Slurm/OpenHands here — that remains a separate submission
     flow; this endpoint unblocks Phase 3 UI + model routing.
     """
-    _require_x_user(request)
+    x_user = _require_x_user(request)
 
     if not body.messages:
         raise HTTPException(status_code=422, detail="messages must be non-empty")
@@ -47,6 +48,16 @@ async def agent_chat(
         )
 
     agent_label = body.model
+    
+    # Generate session_id from request for UAT tracking
+    session_id = request.headers.get("X-Session-Id", x_user)
+    
+    # Log agent chat start for UAT activation metrics
+    log_agent_chat_started(
+        user_id=x_user,
+        agent_model=agent_label,
+        session_id=session_id,
+    )
 
     if body.stream:
 
@@ -62,6 +73,15 @@ async def agent_chat(
                 ):
                     yield chunk
             except vllm_client.VllmError as exc:
+                # Log 5xx failures for UAT reliability metrics
+                if exc.status_code >= 500:
+                    log_agent_chat_failed_5xx(
+                        user_id=x_user,
+                        agent_model=agent_label,
+                        session_id=session_id,
+                        status_code=exc.status_code,
+                        error=str(exc),
+                    )
                 log.warning(
                     "vllm_upstream_error",
                     extra={"error": str(exc), "agent_model": agent_label},
@@ -79,7 +99,15 @@ async def agent_chat(
             agent_model=agent_label,
         )
     except vllm_client.VllmError as exc:
+        # Log 5xx failures for UAT reliability metrics
         if exc.status_code >= 500:
+            log_agent_chat_failed_5xx(
+                user_id=x_user,
+                agent_model=agent_label,
+                session_id=session_id,
+                status_code=exc.status_code,
+                error=str(exc),
+            )
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
