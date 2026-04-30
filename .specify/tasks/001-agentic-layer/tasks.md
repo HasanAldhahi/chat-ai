@@ -1128,7 +1128,7 @@ Conduct comprehensive security penetration testing to identify vulnerabilities i
 ---
 
 ### Task 5.2: End-to-End Testing
-**Status:** 🔴 TODO
+**Status:** 🟡 IN PROGRESS (backend integration suite landed; browser-driven Playwright UI suite scoped as follow-up)
 **Priority:** HIGH
 **Est. Effort:** 4-5 days
 **Assignee:** TBD
@@ -1170,6 +1170,26 @@ Write and execute end-to-end tests covering all user stories from the specificat
 - CI/CD integration verified
 - Code reviewed and merged
 - Document test execution steps
+
+**🟡 Implementation note (2026-04-30):**
+- **Backend integration suite** at `agentic/tests/e2e/` (run with `pytest agentic/tests/e2e/ -m e2e`):
+  - One module per user story (`test_us001_…` … `test_us009_…`); auto-tagged `@pytest.mark.e2e` via `conftest.py`.
+  - **US-001** routing of `POST /api/agent/chat` (agent / non-agent / missing X-User / empty messages).
+  - **US-002** MCP `tools/list` + `tools/call web_search` (URL+title+snippet, validation).
+  - **US-003** MCP `fs_read` round-trip; `/etc/passwd` and traversal blocked; `fs_list` sandboxed; write/read round-trip.
+  - **US-004** Bob ↛ Alice on jobs status/cancel + SSE publish/subscribe (403); Alice can read her own.
+  - **US-005** SseHub publish→subscribe wire-format frame + timestamp preserved; action/result/error round-trip; 429 + Retry-After; four event kinds accepted.
+  - **US-006** per-user Vault path scoping (captured-URL assertion); missing X-User blocks before Vault round-trip; unknown `secret_type` 422.
+  - **US-007** six agent labels routed; in-session switch keeps each label intact.
+  - **US-008** `web_browse` blocks RFC1918 / loopback / IPv6 ULA / cloud-metadata IPs and `internal.gwdg.de` suffixes; non-http(s) schemes blocked.
+  - **US-009** SSE idle reaper evicts the room; subscriber disconnect releases queue; auth session TTL forces re-login (401 `expired`).
+  - **48 tests; passes in ~1.4 s.** Combined with Task 5.1 security suite: 111 tests under the two markers.
+  - `conftest.py` provides shared builders: `broker_client`, `make_broker_client`, `make_broker_client_with_vault` (real `httpx.MockTransport` for capture), `mcp_client`, `auth_headers`. Slurm + Vault in mock mode by default; vLLM mocked per-test via `monkeypatch`.
+  - `agentic/pytest.ini` registers the `e2e` marker.
+- **Operator artifact** at `agentic/docs/E2E_TESTING.md` — coverage matrix per US, Playwright follow-up scope (stack start-up, Playwright spec targets, CI matrix), and the suggested CI gate snippet.
+- **Remainder** (operator-driven): Playwright browser suite once a deployable stack is reachable (US-001 dropdown / US-002 send / US-005 activity feed / US-007 in-session swap / US-008 retry alert); Docker-compose orchestration for the CI matrix entry; latency budget enforcement (Task 5.3).
+
+**Branch stack:** **`task-5.2-end-to-end-testing`** from **`task-5.1-security-pentest`**.
 
 ---
 
@@ -1337,8 +1357,8 @@ Prepare system for production launch by setting up monitoring, runbooks, documen
   - MEDIUM: 7
   - LOW: 4
 - **Tasks by Status:**
-  - 🔴 TODO: 18
-  - 🟡 IN PROGRESS: 1
+  - 🔴 TODO: 17
+  - 🟡 IN PROGRESS: 2
   - 🟢 DONE: 12
   - 🔵 BLOCKED: 0
 - **Estimated Total Effort:** 100-135 person-days

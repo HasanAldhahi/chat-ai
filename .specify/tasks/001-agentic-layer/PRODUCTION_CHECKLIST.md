@@ -11,6 +11,9 @@ is environment-specific.
 - [ ] Pentester sign-off recorded in `SECURITY_PENTEST_REPORT.md` § 7
 
 ## 5.2 End-to-end
+- [ ] Run `pytest agentic/tests/e2e/ -m e2e` (backend integration suite — see `task-5.2-end-to-end-testing`; 48 tests, ~1.4 s)
+- [ ] Wire the security + e2e suites as a CI gate that blocks PR merge — see `agentic/docs/E2E_TESTING.md` § 3
+- [ ] Implement Playwright UI suite per `agentic/docs/E2E_TESTING.md` § 2 once a deployable stack is reachable
 - [ ] Chat UI → Node → broker → vLLM smoke (agent model)
 - [ ] Slurm job → Apptainer → MCP + agent smoke on cluster
 
