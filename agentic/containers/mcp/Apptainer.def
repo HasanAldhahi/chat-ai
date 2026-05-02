@@ -42,6 +42,12 @@ Stage: build
     # %environment.
     export PATH=/usr/local/bin:/usr/bin:/bin
 
+    # The base image %environment sets HTTP_PROXY to the GWDG WWW-Cache proxy.
+    # That proxy is unreachable outside GWDG, so pip and apt-get would hang
+    # during the build on a workstation. Unset for the duration of %post;
+    # the proxy is still baked into %environment for runtime use.
+    unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+
     # ----- 1. Python deps --------------------------------------------------
     # The base ships fastapi + uvicorn + httpx already (broker uses them).
     # Re-installing from requirements.txt is idempotent and pins the same

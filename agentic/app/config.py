@@ -70,7 +70,46 @@ class Settings(BaseSettings):
     # development before HPC integration is available.
     slurm_mock_mode: bool = Field(default=False)
 
-    # --- Cluster egress proxy (Task 2.5) -----------------------------------
+    # --- Job execution mode (Task 6.2) -------------------------------------
+    # "slurm"  — submit via slurmrestd (production default)
+    # "mock"   — synthetic job ids, no network call (ci / unit tests)
+    # "local"  — spawn apptainer / python subprocess on this host (dev)
+    execution_mode: str = Field(
+        default="slurm",
+        description="Job execution backend: slurm | mock | local.",
+        pattern="^(slurm|mock|local)$",
+    )
+
+    # Local-exec tuning (only used when execution_mode == "local")
+    local_exec_grace_s: float = Field(
+        default=5.0,
+        gt=0,
+        description="Seconds to wait for SIGTERM before sending SIGKILL to a local job.",
+    )
+    local_exec_fallback_to_python: bool = Field(
+        default=False,
+        description=(
+            "When apptainer is not on PATH, fall back to "
+            "`python -m <AGENTIC_RUNTIME_MODULE>` instead of returning 503."
+        ),
+    )
+    local_exec_keep_proxy: bool = Field(
+        default=False,
+        description="Keep HTTP_PROXY / HTTPS_PROXY env vars when spawning local jobs (off by default — the GWDG proxy is unreachable outside GWDG).",
+    )
+
+    # --- Orchestrator (Task 6.4) ---------------------------------------------
+    # Base URL the broker advertises to runtime containers so they can POST
+    # SSE events back. Default works for local-exec (host network shared).
+    broker_base_url: str = Field(
+        default="",
+        description=(
+            "Base URL containers use to reach the broker SSE ingest endpoint. "
+            "Defaults to http://127.0.0.1:{port} when empty."
+        ),
+    )
+
+    # --- Cluster egress proxy (Task 2.5) -------------------------------------
     cluster_http_proxy: str = Field(
         default="http://www-cache.gwdg.de:3128",
         description="HTTP_PROXY injected into every Slurm agent job.",

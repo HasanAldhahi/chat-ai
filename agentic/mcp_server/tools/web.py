@@ -78,6 +78,28 @@ async def web_search(args: Dict[str, Any]) -> Dict[str, Any]:
     if provider == "stub":
         return {"query": query, "provider": "stub", "results": _stub_results(query, n)}
 
+    if provider == "duckduckgo":
+        from ddgs import DDGS
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        try:
+            items = await loop.run_in_executor(
+                None,
+                lambda: list(DDGS().text(query, max_results=n)),
+            )
+        except Exception as exc:
+            raise ToolError(
+                code=ToolErrorCode.NETWORK_ERROR,
+                message=f"DuckDuckGo search failed: {exc}",
+                rpc_code=-32000,
+            ) from exc
+        results = [
+            {"title": r.get("title", ""), "url": r.get("href", ""), "snippet": r.get("body", "")}
+            for r in items
+        ]
+        return {"query": query, "provider": "duckduckgo", "results": results}
+
     if not s.web_search_api_key:
         raise ToolError(
             code=ToolErrorCode.SEARCH_PROVIDER_UNAVAILABLE,

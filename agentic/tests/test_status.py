@@ -35,6 +35,7 @@ def _build_app(handler: Callable[[httpx.Request], httpx.Response], **overrides):
         slurm_retry_backoff_s=0.0,
         slurm_status_poll_interval_s=0.05,
         slurm_status_cache_ttl_s=0.5,
+        execution_mode="slurm",
     )
     cfg.update(overrides)
     settings = Settings(**cfg)
@@ -268,7 +269,8 @@ def test_terminal_status_still_readable_after_polling_stops():
 
 def test_mock_mode_status_walks_states():
     settings = Settings(slurm_mock_mode=True,
-                          slurm_status_poll_interval_s=0.01)
+                          slurm_status_poll_interval_s=0.01,
+                          execution_mode="mock")
     app = create_app(settings)
     app.dependency_overrides[get_settings] = lambda: settings
 

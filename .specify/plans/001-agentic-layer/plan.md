@@ -342,6 +342,87 @@ Start new work: `git checkout task-3.2-react-agent-model-selection && git pull &
 
 ---
 
+### PHASE 6: Local Orchestration & End-to-End Debugging
+**Duration:** 1-2 weeks
+**Dependency:** Phase 4 (runtime packaging) + Phase 1.6 (SSE hub) + Phase 3 (UI wiring)
+**Goal:** Connect the chat path to the runtime containers and make the whole system runnable on a single dev machine without HPC.
+
+#### Why this phase exists
+After Phase 1–5 the codebase has every component (broker, MCP, runtimes, container recipes, vLLM client, agent UI) but **no orchestration that fires when an agent chat starts**. `POST /api/agent/chat` (Task 2.6) is documented as a vLLM passthrough only — it never submits a Slurm job. As a result, selecting "Agent - Goose" in the UI today returns a plain LLM reply and the SSE channel stays empty. Phase 6 closes the loop and adds a *local-exec* job backend so the path can be exercised end-to-end without a real cluster.
+
+#### Component additions
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    NEW: Agent Orchestration                       │
+│                                                                    │
+│   front   ──POST /api/chat (model="Agent - Goose")──▶  back       │
+│                                                          │         │
+│                                            POST /api/agent/chat    │
+│                                                          ▼         │
+│                                          ┌────────────────────┐    │
+│                                          │ agent_orchestrator │    │
+│                                          │  ─ registry lookup │    │
+│                                          │  ─ ensure_runtime  │    │
+│                                          │  ─ session map     │    │
+│                                          └────────────────────┘    │
+│                                                  │ POST /api/jobs  │
+│                                                  ▼                 │
+│                ┌─────────────────────────────────────────────┐     │
+│                │        execution_mode dispatcher            │     │
+│                │  ┌──────────┐  ┌─────────┐  ┌────────────┐ │     │
+│                │  │  slurm   │  │  mock   │  │   local    │ │     │
+│                │  │ (HPC)    │  │ (no-op) │  │ apptainer  │ │     │
+│                │  │          │  │         │  │  run …sif  │ │     │
+│                │  └──────────┘  └─────────┘  └────────────┘ │     │
+│                └─────────────────────────────────────────────┘     │
+│                                                  │                 │
+│                                  goose / openhands / opencode      │
+│                                  child container running:          │
+│                                   • MCP server (uvicorn)           │
+│                                   • runtime CLI (goose run …)      │
+│                                   • SSE forwarder ────POST /api/sse/{id}/events
+│                                                  │                 │
+│   front  ◀───SSE  /api/chat/agent/sse?session=…──┘ broker hub      │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+#### Components
+
+1. **Apptainer dev install + image build** (Task 6.1) — Ubuntu 22.04 PPA install, build `base.sif` → `mcp.sif` → `goose.sif`, document user-namespace prerequisites.
+
+2. **Local-exec job backend** (Task 6.2) — `AGENTIC_EXECUTION_MODE ∈ {slurm, mock, local}`; in **local** mode the broker spawns `apptainer run` (or falls back to `python -m goose_runtime.launcher`) as a subprocess and exposes the same job lifecycle as Slurm.
+
+3. **Agent runtime registry** (Task 6.3) — single source of truth mapping a frontend agent model id (e.g. `"Agent - Goose (Fast reasoning)"`) to runtime spec: `.sif` image, python module, env, runtime cap.
+
+4. **Chat → job orchestration trigger** (Task 6.4) — first turn of an agent session submits the runtime job, attaches it to the SSE room for `session_id`; non-agent models keep the existing vLLM passthrough.
+
+5. **Front/back wiring for async sessions** (Task 6.5) — broker returns **HTTP 202** for agent chats, response is streamed exclusively via SSE; Stop button cancels the runtime job.
+
+6. **End-to-end smoke test** (Task 6.6) — `pytest -m e2e` boots the full stack with `AGENTIC_EXECUTION_MODE=local` and asserts an `action`/`result` SSE frame.
+
+7. **Debugging guide** (Task 6.7) — `agentic/docs/debugging.md` with a symptom→fix table covering the failures hit during Phase 6 bring-up (`ECONNREFUSED`, missing vLLM URL, mode mismatch, silent SSE, etc.).
+
+8. **Dev-mode config pinning** (Task 6.8) — `agentic/.env.sample`, docker-compose env parity with local mode, startup WARN when configuration is incoherent.
+
+**Deliverables:**
+- Apptainer images buildable on dev host
+- Broker `local` execution mode with full lifecycle parity to Slurm
+- Agent registry shared logically (validated in CI) between front and broker
+- Orchestration trigger wiring chat → job → SSE
+- 202-aware front/back path that preserves plain-chat behaviour
+- E2E smoke test, debugging guide, locked-down dev configuration
+
+**Acceptance Criteria:**
+- Single-machine dev: `agentic/.env` configured → 3 terminals (back, front, broker) → selecting "Agent - Goose" in the UI launches a goose container, MCP tool calls render in the chat as activity rows, final answer renders in the assistant bubble
+- `pytest -m e2e` green
+- Switching `AGENTIC_EXECUTION_MODE=slurm|mock|local` requires no code change
+- Stop button kills the runtime container within the configured grace period
+- Plain (non-agent) chat unchanged
+- Debugging guide accurate against the failures observed during this phase
+
+---
+
 ## Task Dependencies Graph
 
 ```
@@ -377,6 +458,16 @@ Phase 5: Security & Testing
 ├─ Performance Tests (depends on Phase 4 complete)
 ├─ UAT (depends on Phase 4 complete)
 └─ Production Readiness (depends on all above)
+
+Phase 6: Local Orchestration & Debugging
+├─ Apptainer Install (independent)              [6.1]
+├─ Local-Exec Backend (depends on 6.1, 1.2-1.4) [6.2]
+├─ Agent Registry (independent)                  [6.3]
+├─ Orchestration Trigger (depends on 6.2, 6.3, 1.6) [6.4]
+├─ Front/Back Async Wiring (depends on 6.4)      [6.5]
+├─ E2E Smoke Test (depends on 6.1-6.5)           [6.6]
+├─ Debugging Guide (depends on 6.1-6.6)          [6.7]
+└─ Dev Config Pinning (depends on 6.2, 6.7)      [6.8]
 ```
 
 ## Risk Mitigation
@@ -412,4 +503,4 @@ During implementation, track these metrics:
 
 ---
 
-**Version**: 1.0.0 | **Created**: 2026-04-28 | **Status**: Draft
+**Version**: 1.1.0 | **Created**: 2026-04-28 | **Last Updated**: 2026-05-01 (added Phase 6) | **Status**: Draft

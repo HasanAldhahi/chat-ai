@@ -45,7 +45,7 @@ class GooseSettings(BaseSettings):
     goose_config_subdir: str = Field(default=".goose-runtime")
 
     goose_cli: str = Field(default="goose")
-    goose_run_extra: str = Field(
+    run_extra: str = Field(
         default="run --no-session",
         description="Argv fragment between goose binary and -t TEXT",
     )
@@ -57,7 +57,11 @@ class GooseSettings(BaseSettings):
 
     llm_provider: str = Field(
         default="openai",
-        description="Exported for Goose (see Goose headless docs).",
+        description="Exported as GOOSE_PROVIDER (see Goose headless docs).",
+    )
+    llm_model: str = Field(
+        default="",
+        description="Exported as GOOSE_MODEL. If empty, Goose uses its own default for the provider.",
     )
 
 

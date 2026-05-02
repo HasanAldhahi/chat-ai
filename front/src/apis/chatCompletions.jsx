@@ -86,6 +86,14 @@ async function* agentChatCompletions(conversation, timeout = 30000, hooks = {}) 
     }
   }
 
+  // HTTP 202: runtime job submitted — response arrives over SSE, not in this stream.
+  if (res.status === 202) {
+    let json = {};
+    try { json = await res.json(); } catch { /* ignore */ }
+    yield { _agentAsync: true, job_id: json.job_id, session_id: json.session_id };
+    return;
+  }
+
   if (!res.ok) {
     let errObj = {};
     try {

@@ -173,35 +173,17 @@ async def forward_stream(
     if user_id:
         headers["X-User"] = user_id
 
-    queue: asyncio.Queue[Optional[Dict[str, Any]]] = asyncio.Queue(
-        maxsize=max_inflight
-    )
+    # Semaphore caps concurrent in-flight HTTP POSTs to max_inflight.
+    # Tasks are spawned per-line so the queue never overflows — large tool
+    # outputs (file reads, shell output) are fully forwarded, not dropped.
+    sem = asyncio.Semaphore(max_inflight)
+    pending: List[asyncio.Task] = []  # type: ignore[type-arg]
 
     owns_client = http_client is None
     client = http_client or httpx.AsyncClient(timeout=timeout_s)
 
-    async def producer() -> None:
-        async for raw in lines:
-            stats.raw_lines += 1
-            translated = translate_line(raw)
-            if translated is None:
-                continue
-            try:
-                queue.put_nowait(translated)
-            except asyncio.QueueFull:
-                stats.dropped_overflow += 1
-                log.warning(
-                    "sse_forwarder_drop_overflow",
-                    extra={"max_inflight": max_inflight},
-                )
-        # Sentinel: tell the consumer to drain and exit.
-        await queue.put(None)
-
-    async def consumer() -> None:
-        while True:
-            item = await queue.get()
-            if item is None:
-                return
+    async def post_one_item(item: Dict[str, Any]) -> None:
+        async with sem:
             ok = await _post_one(client, url, headers, item, timeout_s)
             if ok:
                 stats.forwarded += 1
@@ -210,7 +192,17 @@ async def forward_stream(
                 stats.dropped_post_failed += 1
 
     try:
-        await asyncio.gather(producer(), consumer())
+        async for raw in lines:
+            stats.raw_lines += 1
+            translated = translate_line(raw)
+            if translated is None:
+                continue
+            task = asyncio.create_task(post_one_item(translated))
+            pending.append(task)
+
+        # Wait for all in-flight POSTs to complete before returning.
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
     finally:
         if owns_client:
             await client.aclose()

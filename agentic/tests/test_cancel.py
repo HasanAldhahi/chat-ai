@@ -23,6 +23,7 @@ def _build_app(handler: Callable[[httpx.Request], httpx.Response], **overrides):
         slurm_status_poll_interval_s=10.0,
         slurm_status_cache_ttl_s=10.0,
         slurm_cancel_grace_period_s=0.0,
+        execution_mode="slurm",
     )
     cfg.update(overrides)
     settings = Settings(**cfg)
@@ -239,6 +240,7 @@ def test_mock_mode_cancel_flow_end_to_end():
         slurm_status_poll_interval_s=0.05,
         slurm_status_cache_ttl_s=0.0,
         slurm_cancel_grace_period_s=0.0,
+        execution_mode="mock",
     )
     app = create_app(settings)
     app.dependency_overrides[get_settings] = lambda: settings

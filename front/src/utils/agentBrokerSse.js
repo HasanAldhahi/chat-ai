@@ -82,10 +82,14 @@ export async function readAgentSseBody(body, signal, onFrame) {
   }
 }
 
+// One AbortController per session — prevents subscriber accumulation across messages.
+const _sseControllers = new Map();
+
 /**
  * Subscribe to broker tool/action SSE for an agent session.
- * Uses the same AbortSignal as POST /api/chat/agent so Stop aborts both.
- * @returns {() => void} noop disposer (abort owns teardown)
+ * Any previous SSE connection for the same sessionId is aborted first so only
+ * one subscriber is active at a time (prevents duplicate frame delivery).
+ * @returns {() => void} disposer that tears down this connection
  */
 export function startAgentBrokerSse({
   sessionId,
@@ -95,10 +99,23 @@ export function startAgentBrokerSse({
 }) {
   if (!sessionId || !signal) return () => {};
 
+  // Abort previous connection for this session (subscriber-leak fix).
+  const prev = _sseControllers.get(sessionId);
+  if (prev) {
+    prev.abort();
+    _sseControllers.delete(sessionId);
+  }
+
+  const controller = new AbortController();
+  _sseControllers.set(sessionId, controller);
+
+  // Chain to the caller's signal so the Stop button also kills the SSE.
+  const onCallerAbort = () => controller.abort();
+  signal.addEventListener("abort", onCallerAbort, { once: true });
+
   const run = async () => {
-    let baseURL;
     try {
-      baseURL = resolveBackendBaseUrl();
+      const baseURL = resolveBackendBaseUrl();
       const url = new URL("api/chat/agent/sse", baseURL);
       url.searchParams.set("session_id", String(sessionId));
       const res = await fetch(url.toString(), {
@@ -107,22 +124,27 @@ export function startAgentBrokerSse({
           Accept: "text/event-stream",
           "X-User": resolveAgenticXUser(),
         },
-        signal,
+        signal: controller.signal,
       });
       if (!res.ok) {
         onConnectionError?.(res.status);
         return;
       }
       if (!res.body) return;
-      await readAgentSseBody(res.body, signal, onFrame);
+      await readAgentSseBody(res.body, controller.signal, onFrame);
     } catch (err) {
       if (err?.name === "AbortError") return;
       onConnectionError?.(err);
+    } finally {
+      signal.removeEventListener("abort", onCallerAbort);
+      if (_sseControllers.get(sessionId) === controller) {
+        _sseControllers.delete(sessionId);
+      }
     }
   };
 
   void run();
-  return () => {};
+  return () => controller.abort();
 }
 
 export function toolIconForType(type) {
@@ -133,7 +155,14 @@ export function toolIconForType(type) {
   return "⚙️";
 }
 
-const SSE_EVENTS = new Set(["action", "result", "error", "message"]);
+const SSE_EVENTS = new Set([
+  "action",
+  "result",
+  "error",
+  "message",
+  "assistant.delta",
+  "assistant.final",
+]);
 
 export function isAgentSseEventName(name) {
   return SSE_EVENTS.has(String(name || ""));
@@ -141,12 +170,28 @@ export function isAgentSseEventName(name) {
 
 /**
  * Normalizes one SSE frame from the broker into a message row for React state.
+ * For assistant.delta / assistant.final events, extracts the text chunk.
  */
 export function normalizeAgentSseActivity(frame) {
   const { event, data } = frame;
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const d = data && typeof data === "object" ? data : {};
   const timestamp = d.timestamp || d.time || new Date().toISOString();
+
+  if (event === "assistant.delta" || event === "assistant.final") {
+    return {
+      id,
+      sseEvent: event,
+      type: event,
+      timestamp,
+      text: typeof d.text === "string" ? d.text : "",
+      message: "",
+      output: "",
+      code: "",
+      expanded: false,
+    };
+  }
+
   const type = d.type || d.tool || "";
   const msg = d.message ?? d.msg ?? "";
   const output = d.output ?? d.result ?? d.content ?? "";
@@ -174,4 +219,5 @@ export function normalizeAgentSseActivity(frame) {
           : JSON.stringify(d));
   }
   return activity;
+
 }

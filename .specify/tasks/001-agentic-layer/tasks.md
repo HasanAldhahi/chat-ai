@@ -1289,19 +1289,252 @@ Prepare system for production launch by setting up monitoring, runbooks, documen
 
 ---
 
+## PHASE 6: Local Orchestration & End-to-End Debugging
+
+**Goal:** Wire the chat path to actually launch a runtime container (goose, OpenHands, opencode) and stream its tool activity back over SSE — including a *local-exec* mode so the system can be exercised end-to-end on a single dev machine without a real Slurm cluster.
+
+**Background (why this phase exists):**
+- Tasks 1.x–4.x built every component (broker, MCP, runtimes, container recipes, vLLM passthrough, UI), but **`POST /api/agent/chat`** is currently a vLLM passthrough only — see `agentic/app/routers/agent_chat.py` docstring: *"Does not execute Slurm/OpenHands here — that remains a separate submission flow."*
+- Selecting **"Agent - Goose"** in the UI today opens an SSE subscription that no one publishes to, and gets a plain LLM reply instead of a tool-using agent run.
+- This phase adds the orchestration layer (chat → submit job → runtime container publishes SSE) **and** a local-exec backend so dev/UAT works without HPC.
+
+---
+
+### Task 6.1: Apptainer Dev Installation & Base Image Build
+**Status:** 🔴 TODO
+**Priority:** HIGH
+**Est. Effort:** 0.5 days
+
+**Description:**
+Install Apptainer on the developer machine (Ubuntu 22.04) and build the **`base.sif`** + **`mcp.sif`** + **`goose.sif`** images locally so the runtime can actually be launched. Document the install steps + add a `make images` target.
+
+**Requirements:**
+- `apt-get install -y software-properties-common && add-apt-repository -y ppa:apptainer/ppa && apt-get install -y apptainer` (Ubuntu 22.04 official PPA)
+- Verify `apptainer --version` and `apptainer run docker://hello-world` works without root for a regular user
+- Build the recipes already shipped in `agentic/containers/{base,mcp,goose}/Apptainer.def` into `.sif` files under `agentic/containers/_out/`
+- Add `agentic/containers/build_all.sh` (or `make images`) wrapping the three builds in dependency order (base → mcp → goose)
+- Document required user-namespace flags for Ubuntu 22.04 (`/etc/subuid`, `/etc/subgid`) if they aren't auto-configured
+
+**Acceptance Criteria:**
+- `apptainer --version` returns ≥ 1.3 on the dev host
+- `agentic/containers/_out/{base,mcp,goose}.sif` all exist
+- `apptainer exec agentic/containers/_out/goose.sif goose --version` succeeds
+- `apptainer exec agentic/containers/_out/mcp.sif python -m mcp_server --help` succeeds
+- README step-by-step verified by re-running on a clean shell
+
+**Dependencies:** None
+**Definition of Done:** Images build reproducibly, README updated under `agentic/README.md` → "Local container images", `.gitignore` excludes `_out/*.sif`.
+
+---
+
+### Task 6.2: Broker Local-Exec Job Backend
+**Status:** 🔴 TODO
+**Priority:** HIGH
+**Est. Effort:** 1.5 days
+
+**Description:**
+Add a third execution mode to the broker so `POST /api/jobs` can be served **without** a real Slurm cluster — by running the runtime process locally (preferring `apptainer run` against a `.sif`, falling back to a direct `python -m <runtime>.launcher` for laptops without Apptainer).
+
+**Requirements:**
+- New setting `AGENTIC_EXECUTION_MODE` ∈ `{slurm, mock, local}` in `agentic/app/config.py` (default `slurm` in prod, `local` in dev `.env`)
+- New module `agentic/app/services/local_executor.py`:
+  - `submit(req: JobSubmissionRequest, user_id: str) -> JobSubmissionResult` — spawns `apptainer run <sif> ...` as `asyncio.subprocess`, registers the PID under a synthetic `local-<uuid>` job id, captures stdout/stderr to a per-job log file under `agentic/var/jobs/<job_id>/`
+  - `status(job_id) -> JobStatus` — maps process state to the existing `JobState` enum (`PENDING` while spawning, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`)
+  - `cancel(job_id, reason)` — `proc.terminate()` then `proc.kill()` after grace
+  - Background reaper task that updates terminal state when the child exits
+- `app/routers/jobs.py` dispatches to `SlurmClient` or `LocalExecutor` based on `settings.execution_mode`; existing **mock** path untouched
+- Ownership / SSE / cancellation contracts identical to Slurm path (so `app/services/job_monitor.py` works without branches)
+- Fallback chain: if `apptainer` not on PATH **and** `AGENTIC_LOCAL_EXEC_FALLBACK_TO_PYTHON=true`, run `python -m goose_runtime.launcher` directly with the same env
+
+**Acceptance Criteria:**
+- `pytest tests/test_local_executor.py` covers submit/status/cancel + fallback branch
+- With `AGENTIC_EXECUTION_MODE=local` and `apptainer` on PATH, `POST /api/jobs` returns a `local-…` job id, `GET /api/jobs/{id}/status` flips RUNNING→COMPLETED, child exits cleanly
+- `DELETE /api/jobs/{id}` kills the child within `AGENTIC_LOCAL_EXEC_GRACE_S`
+- Cross-user 403 still enforced
+- `var/jobs/*/stdout.log` captured for debugging
+
+**Dependencies:** Task 6.1 (need Apptainer on dev), Task 1.2/1.3/1.4 (existing job lifecycle contracts)
+**Definition of Done:** Test suite green, switching `AGENTIC_EXECUTION_MODE=mock|local|slurm` requires no code change, docstring on `app/services/local_executor.py` lists every captured environment variable.
+
+---
+
+### Task 6.3: Agent Runtime Registry
+**Status:** 🔴 TODO
+**Priority:** HIGH
+**Est. Effort:** 0.5 days
+
+**Description:**
+Single source of truth that maps a frontend agent model id (e.g. `"Agent - Goose (Fast reasoning)"`) to the runtime config the broker uses to launch a container. Currently the catalog only lives in `front/src/constants/chatAiAgentModels.js`; the broker has no mapping.
+
+**Requirements:**
+- New module `agentic/app/services/agent_registry.py` exporting `RUNTIMES: dict[str, RuntimeSpec]` where `RuntimeSpec` is:
+  ```python
+  class RuntimeSpec(BaseModel):
+      model_id: str           # "Agent - Goose (Fast reasoning)"
+      runtime_key: str        # "goose" | "openhands" | "opencode" | "smolagents"
+      sif_image: str          # "containers/_out/goose.sif" — relative to AGENTIC_CONTAINER_ROOT
+      python_module: str      # "goose_runtime.launcher" — used by local-exec fallback
+      base_env: dict[str, str]  # GOOSE_*, OPENHANDS_*, etc.
+      max_runtime_s: int
+  ```
+- `lookup(model_id: str) -> RuntimeSpec` — case-insensitive substring match (`"goose"` in lower-cased id), returns `None` for non-agent models
+- Cross-validate at import time that every registered `python_module` is importable
+- Mirror the four agents already declared on the front (`Goose`, `OpenHands`, `smolagents`, `opencode`) — even if some `.sif` images aren't built yet (mark `enabled=False`)
+
+**Acceptance Criteria:**
+- `pytest tests/test_agent_registry.py` covers happy-path + unknown-model + disabled-runtime cases
+- `lookup("Agent - Goose (Fast reasoning)")` returns the goose spec; `lookup("meta-llama-3.1-8b")` returns `None`
+- Front and broker registries diverge → CI fails (test parses `chatAiAgentModels.js` and asserts every `id` exists in `RUNTIMES`)
+
+**Dependencies:** None (pure data + lookup)
+**Definition of Done:** Registry imported by Tasks 6.4/6.5, no agent id hardcoded in router code.
+
+---
+
+### Task 6.4: Chat → Job Orchestration Trigger
+**Status:** 🔴 TODO
+**Priority:** HIGH
+**Est. Effort:** 2 days
+
+**Description:**
+Replace the current vLLM-passthrough behaviour of `POST /api/agent/chat` (when an agent model is selected) with the real orchestration: on the **first** turn of an agent session, the broker submits a job for the runtime container, attaches it to the SSE room for that `session_id`, and streams tool events back. Subsequent turns of the same session reuse the running job.
+
+**Requirements:**
+- New module `agentic/app/services/agent_orchestrator.py`:
+  - `ensure_runtime(session_id, user_id, model_id, prompt) -> JobSubmissionResult` — looks up `RuntimeSpec` from Task 6.3, idempotently submits the job, stores `(session_id, user_id) → job_id` in an in-memory map keyed by session, sets the runtime's `*_BROKER_SSE_URL` env to the local broker so the runtime can `POST /api/sse/{session_id}/events`
+  - Reuses an existing job for the same `(session_id, user_id)` until it terminates
+  - Sends the user prompt to the runtime via `*_SESSION_PROMPT` env on the **first** turn; for follow-up turns, write to a per-session FIFO that the runtime tails (deferred — see "Out of scope")
+- Update `agentic/app/routers/agent_chat.py`:
+  - When `body.model` is in the agent registry → call `agent_orchestrator.ensure_runtime(...)`, return **HTTP 202 Accepted** with `{job_id, session_id}` and let the front consume the SSE channel for the actual response (no vLLM call here)
+  - When `body.model` is **not** an agent model → keep current vLLM passthrough (preserves Task 2.6 behaviour)
+- `agent_orchestrator` cancels the job on session expiry / `DELETE /api/agent/sessions/{id}` (new endpoint)
+- Out of scope for this task (track separately): multi-turn within a single goose process — first turn launches a fresh container, follow-up turns within ~30 minutes reuse it via prompt FIFO
+
+**Acceptance Criteria:**
+- With `AGENTIC_EXECUTION_MODE=local`, choosing **Agent - Goose** in the UI → broker logs `agent_orchestrator.launch_ok` → `apptainer run goose.sif` child appears → goose's stdout SSE-forwarded events visible at `/api/sse/{session_id}` → MCP tool calls (e.g. `fs_read`, `web_search`) visible as `action`/`result` SSE frames
+- `pytest tests/test_agent_orchestrator.py` covers: first-turn launch, idempotent reuse for same session, cross-user isolation, vLLM passthrough preserved for non-agent models
+- Goose container exits cleanly when the chat session is stopped from the UI
+- No regression: selecting a plain (non-agent) model continues to use the vLLM passthrough
+
+**Dependencies:** Tasks 6.2 (local-exec), 6.3 (registry), 1.6 (SSE hub)
+**Definition of Done:** End-to-end smoke from `front` → goose tool call → SSE frame in browser DevTools, all tests green.
+
+---
+
+### Task 6.5: Front/Back Wiring for Async Agent Sessions
+**Status:** 🔴 TODO
+**Priority:** HIGH
+**Est. Effort:** 1 day
+
+**Description:**
+Adjust the front + Node back so that for agent models the chat request expects an **async** runtime (HTTP 202 from broker, payload streamed only via SSE) instead of the synchronous chat-completions stream that vLLM-passthrough returns today.
+
+**Requirements:**
+- `back/agentic-routes.mjs` `proxyAgentChatPost`: accept the broker's **202** as a non-error, return JSON `{job_id, session_id}` to the front
+- `front/src/utils/sendMessage.jsx`: when the response status is 202, do **not** read the response body as chat-completions SSE; rely on `startAgentBrokerSse` (already wired) for content; treat the assistant bubble as "loading" until an SSE `result` (or `error`) frame arrives
+- `front/src/utils/agentBrokerSse.js`: extend `SSE_EVENTS` to include `assistant.delta` / `assistant.final` (text chunks the runtime publishes); render them into the assistant bubble alongside the existing `action` / `result` activity feed
+- Stop button: `front/src/utils/sendMessage.jsx` AbortSignal must also call `DELETE /api/agent/sessions/{id}` on the back so the broker cancels the runtime job
+
+**Acceptance Criteria:**
+- Agent chat: assistant bubble fills with text + tool activity rows, no duplicated message
+- Plain chat: unchanged
+- Stop button kills the goose container and the assistant bubble shows a cancelled state
+- Vitest: `sendMessage` and `agentBrokerSse` tests cover 202 → SSE-only response path
+
+**Dependencies:** Task 6.4
+**Definition of Done:** Manual UAT against running stack passes; no test regressions.
+
+---
+
+### Task 6.6: End-to-End Smoke Test (Local)
+**Status:** 🔴 TODO
+**Priority:** MEDIUM
+**Est. Effort:** 0.5 days
+
+**Description:**
+Add a single scripted end-to-end test that boots broker (local-exec), back, and front, then drives a full agent turn ("read this file and summarize") and asserts the tool activity arrives over SSE.
+
+**Requirements:**
+- `agentic/tests/e2e/test_smoke_goose_local.py` using `httpx` + `pytest-asyncio`
+- Spawns broker on a free port with `AGENTIC_EXECUTION_MODE=local`, posts to `/api/agent/chat`, subscribes to `/api/sse/{id}`, asserts ≥ 1 `action` frame with `type ∈ {fs_read, web_search}` and a final `result`/`assistant.final`
+- Marker: `pytest -m e2e` (skipped by default)
+
+**Acceptance Criteria:**
+- `pytest -m e2e tests/e2e/test_smoke_goose_local.py` green on dev host with goose.sif present
+- Test fails clearly if Apptainer missing (skip with reason) or vLLM unreachable (skip with reason)
+
+**Dependencies:** Tasks 6.1–6.5
+**Definition of Done:** Documented in `agentic/README.md` under "End-to-end smoke test".
+
+---
+
+### Task 6.7: Operational Debugging Guide
+**Status:** 🔴 TODO
+**Priority:** MEDIUM
+**Est. Effort:** 0.5 days
+
+**Description:**
+A single page (`agentic/docs/debugging.md`) covering the failure modes already encountered while bringing this up, so the next person doesn't rediscover them.
+
+**Required sections:**
+- **Symptom → diagnosis → fix** table for each:
+  - `ECONNREFUSED 127.0.0.1:8001` (broker down or wrong port)
+  - `vLLM base URL not configured (AGENTIC_VLLM_BASE_URL)` (env not exported)
+  - "Agent reply is just a normal chat response" (orchestration not configured / agent registry miss / `AGENTIC_EXECUTION_MODE=mock`)
+  - "SSE subscriber count grows but no events arrive" (runtime crashed before forwarder started, check `var/jobs/<id>/stdout.log`)
+  - `apptainer: command not found` (see Task 6.1)
+  - `goose: command not found inside container` (image build wrong)
+- **Health endpoints:** `/health` (broker), `/api/vllm/health` (vLLM probe), `/api/jobs/{id}/status` (job state)
+- **Log locations:** broker stdout, `agentic/var/jobs/<id>/stdout.log`, goose `~/.config/goose/`
+- **Environment-variable checklist** with which file should set what (`docker-compose.yml` vs `agentic/.env` vs shell exports), plus the precedence rule (CLI flags override env, env overrides `.env`)
+
+**Acceptance Criteria:**
+- A new contributor following this guide can bring a broken stack back up without asking
+- Linked from `agentic/README.md`
+
+**Dependencies:** Tasks 6.1–6.6 (so symptoms are accurate)
+**Definition of Done:** Reviewed against this session's actual debugging trail.
+
+---
+
+### Task 6.8: Dev-Mode Configuration Pinning
+**Status:** 🔴 TODO
+**Priority:** MEDIUM
+**Est. Effort:** 0.5 days
+
+**Description:**
+Lock down dev configuration so nobody hits the same port-mismatch / missing-env-var class of bug we hit while debugging this phase.
+
+**Requirements:**
+- Add `agentic/.env.sample` with every required `AGENTIC_*` var (broker port, execution mode, vLLM base URL, SSE settings, container root) and a clear comment per line
+- Update `agentic/app/config.py` to load `.env` automatically (it already does via `pydantic-settings`; verify and document)
+- Update `docker-compose.yml`'s `agentic` service env block to include the new `AGENTIC_EXECUTION_MODE`, `AGENTIC_VLLM_BASE_URL`, `AGENTIC_VLLM_API_KEY` (sourced from secrets), and `AGENTIC_CONTAINER_ROOT` so docker-mode and local-mode boot identically
+- Update root `README.md` Development section: replace the bare uvicorn command with `cp .env.sample .env && python -m uvicorn …` so the env is auto-loaded
+- Add a startup banner: when `AGENTIC_VLLM_BASE_URL` is empty **and** `AGENTIC_EXECUTION_MODE != mock`, the broker logs a single WARN line with a link to the debugging guide
+
+**Acceptance Criteria:**
+- Fresh clone → `cp .env.sample .env`, edit two values, `npm run start` (back) + `npm run dev` (front) + `python -m uvicorn …` (agentic) → goose chat works
+- `docker compose up` boots an equivalent stack that talks to the same vLLM endpoint as local mode
+- Misconfiguration produces a single actionable error, not a stack trace
+
+**Dependencies:** Task 6.2 (execution mode setting), Task 6.7 (link target)
+**Definition of Done:** Tested by stopping all three services and rebuilding from `.env.sample`.
+
+---
+
 ## Task Statistics
 
-- **Total Tasks:** 31
+- **Total Tasks:** 39
 - **Tasks by Priority:**
-  - HIGH: 20
-  - MEDIUM: 7
+  - HIGH: 24
+  - MEDIUM: 11
   - LOW: 4
 - **Tasks by Status:**
-  - 🔴 TODO: 19
+  - 🔴 TODO: 27
   - 🟡 IN PROGRESS: 0
   - 🟢 DONE: 12
   - 🔵 BLOCKED: 0
-- **Estimated Total Effort:** 100-135 person-days
+- **Estimated Total Effort:** 107-142 person-days
 
 ## Task Dependencies Summary
 
@@ -1311,6 +1544,7 @@ Critical Path:
 1.6 + 1.7 → 3.1 → 3.3 (Frontend integration)
 2.2 + 2.3 → 2.6 → 4.1/4.2/4.3 → 4.4 (Multi-agent)
 All previous → 5.1 → 5.2 → 5.3 → 5.4 → 5.5 (Testing & Production)
+4.1 + 1.6 → 6.1 → 6.2 → 6.3 → 6.4 → 6.5 → 6.6 → 6.7 → 6.8 (Local orchestration & debugging)
 
 ## Next Steps
 
@@ -1318,7 +1552,8 @@ All previous → 5.1 → 5.2 → 5.3 → 5.4 → 5.5 (Testing & Production)
 2. Create GitHub issues for first 5-10 high-priority tasks
 3. Begin implementation with Task 1.1 (FastAPI Setup)
 4. Parallel: start Task 2.1 (Base Apptainer Image) (no dependencies)
+5. **Phase 6 (started 2026-05-01):** start with Task 6.1 (Apptainer install) — blocks 6.2 onwards. Tasks 6.3 + 6.7 + 6.8 can be done in parallel with 6.1.
 
 ---
 
-**Version**: 1.0.0 | **Created**: 2026-04-28 | **Last Updated**: 2026-04-28 | **Status**: Draft
+**Version**: 1.1.0 | **Created**: 2026-04-28 | **Last Updated**: 2026-05-01 (added Phase 6) | **Status**: Draft

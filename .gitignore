@@ -4,3 +4,9 @@ node_modules/
 .DS_Store
 .env.local
 .env.production
+
+# Apptainer built images (large binaries — build locally or pull from registry)
+agentic/containers/**/*.sif
+agentic/containers/**/*.sif.log
+agentic/containers/**/*.sif.meta.json
+agentic/containers/_out/

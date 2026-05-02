@@ -55,7 +55,7 @@ async def _stream_lines(reader: asyncio.StreamReader) -> AsyncIterator[str]:
 def _build_goose_argv(settings: cfg_module.GooseSettings) -> List[str]:
     if settings.dev_command_override.strip():
         return shlex.split(settings.dev_command_override)
-    return [settings.goose_cli, *shlex.split(settings.goose_run_extra), "-t", settings.session_prompt]
+    return [settings.goose_cli, *shlex.split(settings.run_extra), "-t", settings.session_prompt]
 
 
 def _build_goose_env(settings: cfg_module.GooseSettings) -> dict:
@@ -68,14 +68,16 @@ def _build_goose_env(settings: cfg_module.GooseSettings) -> dict:
         else (py_path or extra_py)
     )
     env.setdefault("HOME", settings.home_dir)
-    env.setdefault(
-        "XDG_CONFIG_HOME", str(Path(settings.home_dir) / ".config")
-    )
+    env.setdefault("XDG_CONFIG_HOME", str(Path(settings.home_dir) / ".config"))
+    # XDG_DATA_HOME controls where goose stores session history files.
+    env.setdefault("XDG_DATA_HOME", str(Path(settings.home_dir) / ".local" / "share"))
     env["GOOSE_MODE"] = settings.goose_mode
     env["GOOSE_CONTEXT_STRATEGY"] = settings.goose_context_strategy
     env["GOOSE_DISABLE_SESSION_NAMING"] = "true"
     if settings.llm_provider:
         env.setdefault("GOOSE_PROVIDER", settings.llm_provider)
+    if settings.llm_model:
+        env.setdefault("GOOSE_MODEL", settings.llm_model)
     return env
 
 

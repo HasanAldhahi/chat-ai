@@ -491,10 +491,74 @@ stacks bootstrap from [`containers/base/base.sif`](containers/base/) (Task 2.1)
 via `Bootstrap: localimage`. The base ships Python 3.11, Node 20, Google
 Chrome stable, and the headless-browser runtime libs.
 
-The build is deferred to whoever has cluster / build-host access (the
-dev VM has no `apptainer` binary). The **recipes** are tested here via
-`tests/test_apptainer_base.py`, `test_apptainer_mcp.py`,
-`test_apptainer_openhands.py`, and `test_apptainer_sandbox.py` (static parsing — required sections, wiring,
-`%runscript --help` exit 0; base image exports GWDG proxy defaults per Task 2.5).
-smoke-tested by `containers/*/test_image.sh` on a host with Apptainer
-and the prerequisite `.sif` chain (`base.sif` → `mcp.sif` → `openhands.sif`).
+The **recipes** are tested via `tests/test_apptainer_base.py`,
+`test_apptainer_mcp.py`, `test_apptainer_openhands.py`, and
+`test_apptainer_sandbox.py` (static parsing). Runtime smoke is via
+`containers/*/test_image.sh`.
+
+## Local container images (Task 6.1)
+
+Apptainer ≥ 1.3 is required. Ubuntu 22.04 install:
+
+```bash
+sudo add-apt-repository -y ppa:apptainer/ppa
+sudo apt-get update && sudo apt-get install -y apptainer
+apptainer --version   # expect 1.4+
+```
+
+Build all images in dependency order (`base` → `mcp` → `goose`):
+
+```bash
+cd agentic/containers
+./build_all.sh --fakeroot          # builds base.sif, mcp.sif, goose.sif
+./build_all.sh --fakeroot --force  # rebuild from scratch
+```
+
+Or build individually with `--force` to overwrite:
+
+```bash
+cd agentic/containers/base  && ./build_image.sh --fakeroot --force
+cd agentic/containers/mcp   && ./build_image.sh --fakeroot --force
+cd agentic/containers/goose && ./build_image.sh --fakeroot --force
+```
+
+Smoke-test after building:
+
+```bash
+agentic/containers/base/test_image.sh  agentic/containers/base/base.sif
+agentic/containers/mcp/test_image.sh   agentic/containers/mcp/mcp.sif
+agentic/containers/goose/test_image.sh agentic/containers/goose/goose.sif
+```
+
+Copy built images to `containers/_out/` for use with the local-exec
+broker mode (`AGENTIC_EXECUTION_MODE=local`, Task 6.2):
+
+```bash
+mkdir -p agentic/containers/_out
+cp agentic/containers/base/base.sif \
+   agentic/containers/mcp/mcp.sif   \
+   agentic/containers/goose/goose.sif \
+   agentic/containers/_out/
+```
+
+`.sif` files are excluded from git (`.gitignore`).
+
+> **GWDG proxy note:** The `%environment` section of every image sets
+> `HTTP_PROXY=http://www-cache.gwdg.de:3128`. On a machine **outside**
+> GWDG's network, override at run time:
+> ```bash
+> APPTAINERENV_HTTP_PROXY="" APPTAINERENV_HTTPS_PROXY="" \
+>   apptainer run containers/goose/goose.sif
+> ```
+
+## End-to-end smoke test (Task 6.6)
+
+Once images are built and the broker is running with
+`AGENTIC_EXECUTION_MODE=local`:
+
+```bash
+cd agentic
+pytest -m e2e tests/e2e/test_smoke_goose_local.py -v
+```
+
+See [docs/debugging.md](docs/debugging.md) if the smoke test fails.

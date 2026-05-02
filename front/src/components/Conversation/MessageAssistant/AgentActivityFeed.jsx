@@ -18,12 +18,16 @@ function formatTimestamp(ts) {
 export default function AgentActivityFeed({ activities, onToggleExpand }) {
   if (!activities?.length) return null;
 
+  // For agent runs, filter to only show error events (result is shown by the terminal renderer)
+  const visible = activities.filter((a) => a.sseEvent === "error" || a.sseEvent === "action");
+  if (!visible.length) return null;
+
   return (
     <div
       className="flex flex-col gap-2 mb-2 w-full max-w-full text-left"
       aria-live="polite"
     >
-      {activities.map((a) => {
+      {visible.map((a) => {
         const isErr = a.sseEvent === "error";
         const icon = isErr ? "⚠️" : toolIconForType(a.type);
         const primary = a.message || "";

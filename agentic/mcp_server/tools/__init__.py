@@ -97,9 +97,8 @@ TOOLS: List[Tool] = [
     Tool(
         name="web_search",
         description=(
-            "Search the public web via the configured provider. The "
-            "broker injects the API key via Vault; with no key configured "
-            "this returns a deterministic stub useful for offline tests."
+            "Search the public web using DuckDuckGo (default, no API key "
+            "required). Returns title, URL, and snippet for each result."
         ),
         input_schema={
             "type": "object",

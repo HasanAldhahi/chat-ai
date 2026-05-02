@@ -13,7 +13,9 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from app.clients.slurm import SlurmClient
 from app.clients.vault import VaultClient
 from app.config import Settings, get_settings
+from app.services.agent_orchestrator import AgentOrchestrator
 from app.services.job_monitor import JobMonitor
+from app.services.local_executor import LocalExecutor
 from app.services.secret_cache import SecretCache
 from app.services.sse_hub import SseHub
 
@@ -86,6 +88,30 @@ async def get_slurm_client(
         client = SlurmClient(settings)
         request.app.state.slurm_client = client
     return client
+
+
+async def get_agent_orchestrator(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> AgentOrchestrator:
+    """Return the app-scoped AgentOrchestrator, creating it lazily on first use."""
+    orch: Optional[AgentOrchestrator] = getattr(request.app.state, "agent_orchestrator", None)
+    if orch is None:
+        orch = AgentOrchestrator(settings)
+        request.app.state.agent_orchestrator = orch
+    return orch
+
+
+async def get_local_executor(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> LocalExecutor:
+    """Return the app-scoped LocalExecutor (only used when execution_mode=local)."""
+    executor: Optional[LocalExecutor] = getattr(request.app.state, "local_executor", None)
+    if executor is None:
+        executor = LocalExecutor(settings)
+        request.app.state.local_executor = executor
+    return executor
 
 
 async def get_job_monitor(

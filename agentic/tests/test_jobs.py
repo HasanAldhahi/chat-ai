@@ -31,6 +31,7 @@ def _build_app(handler: Callable[[httpx.Request], httpx.Response], *, max_retrie
         slurm_base_url="http://slurm.test",
         slurm_max_retries=max_retries,
         slurm_retry_backoff_s=0.0,  # no real sleeping in tests
+        execution_mode="slurm",
     )
     app = create_app(settings)
     # Pin settings so dependency-injected callers see the same instance.
@@ -191,7 +192,7 @@ def test_application_level_errors_in_200_body_map_to_400():
 
 
 def test_mock_mode_short_circuits_without_calling_slurm():
-    settings = Settings(slurm_mock_mode=True)
+    settings = Settings(slurm_mock_mode=True, execution_mode="mock")
     app = create_app(settings)
     app.dependency_overrides[get_settings] = lambda: settings
 

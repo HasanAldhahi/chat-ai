@@ -10,6 +10,7 @@ import {
   mapAgenticStatus,
   normalizeAgentChatPayload,
   proxyAgentChatPost,
+  proxyAgentSessionDelete,
   registerAgenticRoutes,
 } from "../agentic-routes.mjs";
 
@@ -95,6 +96,11 @@ describe("Task 3.1 broker proxy integration (mock broker)", () => {
               res.end(JSON.stringify({ detail: "no user" }));
               return;
             }
+            if (body.async202) {
+              res.writeHead(202, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ job_id: "job-abc", session_id: body.session_id || "s1" }));
+              return;
+            }
             if (body.stream) {
               res.writeHead(200, {
                 "Content-Type": "text/event-stream; charset=utf-8",
@@ -116,6 +122,19 @@ describe("Task 3.1 broker proxy integration (mock broker)", () => {
               }),
             );
           });
+          return;
+        }
+
+        if (req.method === "DELETE" && u.pathname.startsWith("/api/agent/sessions/")) {
+          const xu = req.headers["x-user"] || req.headers["X-User"];
+          if (!xu) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ detail: "auth" }));
+            return;
+          }
+          const sid = u.pathname.replace("/api/agent/sessions/", "");
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ session_id: sid, cancelled: true }));
           return;
         }
 
@@ -280,5 +299,42 @@ describe("Task 3.1 broker proxy integration (mock broker)", () => {
     assert.strictEqual(r.status, 200);
     const j = await r.json();
     assert.strictEqual(j.got_user_id, "agentpath@test");
+  });
+
+  test("POST /api/chat/agent passes broker 202 through to client (Task 6.5)", async () => {
+    const r = await fetch(`http://127.0.0.1:${port}/api/chat/agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-User": "u@gwdg" },
+      body: JSON.stringify({
+        model: "Agent - Goose",
+        messages: [{ role: "user", content: "hi" }],
+        stream: false,
+        async202: true,
+        session_id: "mysession",
+      }),
+    });
+    assert.strictEqual(r.status, 202);
+    const j = await r.json();
+    assert.strictEqual(j.job_id, "job-abc");
+    assert.strictEqual(j.session_id, "mysession");
+  });
+
+  test("DELETE /api/agent/sessions/:id proxies session cancel (Task 6.5)", async () => {
+    const r = await fetch(
+      `http://127.0.0.1:${port}/api/agent/sessions/sess-xyz`,
+      { method: "DELETE", headers: { "X-User": "u@gwdg" } },
+    );
+    assert.strictEqual(r.status, 200);
+    const j = await r.json();
+    assert.strictEqual(j.session_id, "sess-xyz");
+    assert.strictEqual(j.cancelled, true);
+  });
+
+  test("DELETE /api/agent/sessions/:id requires X-User (Task 6.5)", async () => {
+    const r = await fetch(
+      `http://127.0.0.1:${port}/api/agent/sessions/sess-xyz`,
+      { method: "DELETE" },
+    );
+    assert.strictEqual(r.status, 401);
   });
 });

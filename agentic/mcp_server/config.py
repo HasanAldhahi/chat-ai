@@ -72,10 +72,10 @@ class MCPSettings(BaseSettings):
         "truncated and a `response_too_large` error is returned.",
     )
     web_search_provider: str = Field(
-        default="stub",
-        description="`stub` returns a deterministic placeholder result set "
-        "(useful for tests / no API key). `serpapi` would call SerpApi "
-        "with web_search_api_key; left as an extension point.",
+        default="duckduckgo",
+        description="`duckduckgo` uses DuckDuckGo (no API key required). "
+        "`stub` returns deterministic placeholder results (useful for tests). "
+        "`serpapi` calls SerpApi with web_search_api_key.",
     )
     web_search_endpoint: str = Field(
         default="https://serpapi.com/search.json",

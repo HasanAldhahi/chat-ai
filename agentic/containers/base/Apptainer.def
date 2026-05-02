@@ -83,7 +83,18 @@ Stage: build
     # the standard third-party source. We deliberately do NOT replace
     # /usr/bin/python3 (apt depends on it); instead we symlink into
     # /usr/local/bin so PATH resolution picks 3.11 by default.
-    add-apt-repository -y ppa:deadsnakes/ppa
+    #
+    # We add the PPA source + key manually instead of using
+    # add-apt-repository because add-apt-repository calls api.launchpad.net
+    # at key-fetch time and that endpoint is flaky (504 timeouts).
+    echo "deb https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy main" \
+        > /etc/apt/sources.list.d/deadsnakes-ppa.list
+    # Fetch the signing key via curl → gpg --dearmor (no dirmngr / keyserver
+    # daemon needed; pure ASCII→binary transform works in a minimal build root).
+    curl -fsSL \
+        "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776" \
+        | gpg --batch --yes --dearmor \
+            -o /etc/apt/trusted.gpg.d/deadsnakes.gpg
     apt-get update
     apt-get install -y --no-install-recommends \
         python3.11 \

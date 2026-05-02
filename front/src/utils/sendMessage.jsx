@@ -305,13 +305,20 @@ const sendMessage = async ({
       }
       return;
     }
+    const _isAgentTurn = isChatAiAgentModel(localState.settings.model);
     // Pushing message into conversation history
     setLocalState((prev) => ({
       ...prev,
       // Add two new placeholder messages
       messages: [
         ...prev.messages,
-        { role: "assistant", content: [{ type: "text", text: ""}], loading: true },
+        {
+          role: "assistant",
+          content: [{ type: "text", text: ""}],
+          loading: true,
+          // Mark agent messages so GooseTerminalRenderer is used from the start
+          ...(_isAgentTurn ? { agentActivities: [] } : {}),
+        },
         { role: "user", content: [{ type: "text", text: "" }] },
       ],
       hasFirstPrompt: true,
@@ -321,12 +328,83 @@ const sendMessage = async ({
     // Stream assistant response into localState
     async function getChatChunk(conversationId, messageId = null) {
       const modelForAgent = localState.settings.model;
+      let currentContent = [{"type": "text", "text": ""}];
+
+      // For async-202 agent sessions, resolve this promise when SSE signals completion.
+      let resolveAsync202 = null;
+      const async202Promise = new Promise((resolve) => { resolveAsync202 = resolve; });
+
       if (isChatAiAgentModel(modelForAgent) && conversationId) {
         startAgentBrokerSse({
           sessionId: conversationId,
           signal: getActiveRequestSignal(),
           onFrame: (frame) => {
             if (!isAgentSseEventName(frame.event)) return;
+
+            // message: goose stdout line → append to bubble text, no activity row
+            if (frame.event === "message") {
+              const raw = frame.data?.text || "";
+              // Filter out goose ASCII art / session banner lines
+              const isHeader = /^[\s_\\/<>()\|L*●·\-]+$/.test(raw)
+                || raw.includes("goose is ready")
+                || raw.includes("new session")
+                || /^\s*\w+\)\s+\d{8}_\d+\s*·/.test(raw); // e.g. "____) 20260501_4 · /workspace"
+              if (raw && !isHeader) {
+                currentContent[0].text += raw + "\n";
+                setLocalState((prev) => {
+                  if (prev.id !== conversationId) return prev;
+                  const messages = [...prev.messages];
+                  const idx = messages.length - 2;
+                  const row = messages[idx];
+                  if (!row || row.role !== "assistant") return prev;
+                  messages[idx] = { ...row, content: currentContent, loading: true };
+                  return { ...prev, messages, ignoreConflict: true };
+                });
+              }
+              return; // never add message events as activity rows
+            }
+
+            // assistant.delta: stream partial text into bubble
+            if (frame.event === "assistant.delta") {
+              const chunk = frame.data?.text || "";
+              if (chunk) {
+                currentContent[0].text += chunk;
+                setLocalState((prev) => {
+                  if (prev.id !== conversationId) return prev;
+                  const messages = [...prev.messages];
+                  const idx = messages.length - 2;
+                  const row = messages[idx];
+                  if (!row || row.role !== "assistant") return prev;
+                  messages[idx] = { ...row, content: currentContent, loading: true };
+                  return { ...prev, messages, ignoreConflict: true };
+                });
+              }
+              return;
+            }
+
+            // assistant.final: set final text + resolve
+            if (frame.event === "assistant.final") {
+              const text = frame.data?.text;
+              if (typeof text === "string") currentContent[0].text = text;
+              resolveAsync202?.({ answer: currentContent, usage: null });
+              return;
+            }
+
+            if (frame.event === "result") {
+              // If no assistant output arrived, surface the tool output as text
+              if (!currentContent[0].text && frame.data?.output) {
+                currentContent[0].text = String(frame.data.output);
+              }
+              resolveAsync202?.({ answer: currentContent, usage: null });
+              // fall through to add one terminal activity row
+            }
+
+            if (frame.event === "error") {
+              resolveAsync202?.({ answer: currentContent, usage: null });
+              // fall through to add one error activity row
+            }
+
+            // Activity rows: only action / result / error (not message)
             setLocalState((prev) => {
               if (prev.id !== conversationId) return prev;
               const messages = [...prev.messages];
@@ -345,13 +423,15 @@ const sendMessage = async ({
           },
         });
       }
-
-      let currentContent = [{"type": "text", "text": ""}];
       let usage = null;
       let process_block = "";
       let inThinking = false;
       let message_text = "";
       for await (const chunk of chatCompletions(conversationForAPI, timeoutAPI, true, agentHooks)) {
+        // Async 202: runtime job submitted — SSE drives the bubble, wait for it
+        if (chunk?._agentAsync) {
+          return async202Promise;
+        }
         const delta = chunk?.choices?.[0]?.delta;
         if (chunk?.usage) usage = chunk.usage;
         if (Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0) {
@@ -761,6 +841,19 @@ const sendMessage = async ({
     // ‌Handle Errors
     if (error.name === "AbortError") {
       notifyError("Request aborted.");
+      // For agent models, also cancel the running job on the broker
+      if (isChatAiAgentModel(localState.settings.model) && conversationId) {
+        try {
+          const baseURL = (await import("./agentBrokerSse")).resolveBackendBaseUrl();
+          const xUser = (await import("./agentBrokerSse")).resolveAgenticXUser();
+          await fetch(
+            new URL(`api/agent/sessions/${encodeURIComponent(conversationId)}`, baseURL).toString(),
+            { method: "DELETE", headers: { "X-User": xUser } },
+          );
+        } catch {
+          /* best-effort cancel */
+        }
+      }
     } else if (error.message) {
       console.log(error)
       notifyError(error.message);

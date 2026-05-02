@@ -1,19 +1,21 @@
-"""Job submission and status endpoints (Tasks 1.2 + 1.3)."""
+"""Job submission and status endpoints (Tasks 1.2 + 1.3 + 6.2)."""
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.clients.slurm import (
     SlurmClient,
     SlurmError,
     SlurmNotFoundError,
 )
+from app.config import Settings, get_settings
 from app.dependencies import (
     get_bearer_token,
     get_job_monitor,
+    get_local_executor,
     get_slurm_client,
     get_user_id,
 )
@@ -29,6 +31,7 @@ from app.services.job_monitor import (
     JobMonitor,
     JobOwnershipError,
 )
+from app.services.local_executor import LocalExecError, LocalExecutor
 
 log = logging.getLogger("agentic.jobs")
 
@@ -43,8 +46,8 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
         400: {"description": "Invalid request"},
         401: {"description": "Authentication failed"},
         403: {"description": "Authorization failed"},
-        503: {"description": "Slurm unavailable"},
-        502: {"description": "Upstream Slurm error"},
+        503: {"description": "Slurm / local executor unavailable"},
+        502: {"description": "Upstream error"},
     },
 )
 async def submit_job(
@@ -53,6 +56,8 @@ async def submit_job(
     bearer_token: str = Depends(get_bearer_token),
     slurm: SlurmClient = Depends(get_slurm_client),
     monitor: JobMonitor = Depends(get_job_monitor),
+    executor: LocalExecutor = Depends(get_local_executor),
+    settings: Settings = Depends(get_settings),
 ) -> JobSubmissionResponse:
     log.info(
         "job_submit_received",
@@ -60,8 +65,24 @@ async def submit_job(
             "user_id": user_id,
             "session_id": req.session_id,
             "container_image": req.container_image,
+            "execution_mode": settings.execution_mode,
         },
     )
+
+    if settings.execution_mode == "local":
+        try:
+            result = await executor.submit_job(req, bearer_token=bearer_token)
+        except LocalExecError as exc:
+            log.warning(
+                "job_submit_local_error",
+                extra={"user_id": user_id, "session_id": req.session_id, "error": str(exc)},
+            )
+            raise HTTPException(status_code=exc.http_status, detail=str(exc)) from exc
+        executor.set_owner(result.job_id, user_id)
+        log.info("job_submit_ok", extra={"user_id": user_id, "job_id": result.job_id, "mode": "local"})
+        return JobSubmissionResponse(job_id=result.job_id, status="submitted")
+
+    # slurm or mock mode — existing path unchanged
     try:
         result = await slurm.submit_job(req, bearer_token=bearer_token)
     except SlurmError as exc:
@@ -97,7 +118,7 @@ async def submit_job(
     responses={
         403: {"description": "Caller does not own the job"},
         404: {"description": "Job not found"},
-        502: {"description": "Upstream Slurm error"},
+        502: {"description": "Upstream error"},
     },
 )
 async def get_job_status(
@@ -105,34 +126,26 @@ async def get_job_status(
     user_id: str = Depends(get_user_id),
     bearer_token: str = Depends(get_bearer_token),
     monitor: JobMonitor = Depends(get_job_monitor),
+    executor: LocalExecutor = Depends(get_local_executor),
+    settings: Settings = Depends(get_settings),
 ) -> JobStatusResponse:
     try:
-        status = await monitor.get_status(
-            job_id, bearer_token=bearer_token, owner=user_id
-        )
+        if settings.execution_mode == "local":
+            status = await executor.get_status(job_id, owner=user_id)
+        else:
+            status = await monitor.get_status(
+                job_id, bearer_token=bearer_token, owner=user_id
+            )
     except JobOwnershipError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except SlurmNotFoundError as exc:
-        log.info(
-            "job_status_not_found",
-            extra={"user_id": user_id, "job_id": job_id},
-        )
+        log.info("job_status_not_found", extra={"user_id": user_id, "job_id": job_id})
         raise HTTPException(status_code=404, detail="job not found") from exc
     except SlurmError as exc:
-        log.warning(
-            "job_status_upstream_error",
-            extra={"user_id": user_id, "job_id": job_id, "error": str(exc)},
-        )
+        log.warning("job_status_upstream_error", extra={"user_id": user_id, "job_id": job_id, "error": str(exc)})
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    log.info(
-        "job_status_ok",
-        extra={
-            "user_id": user_id,
-            "job_id": job_id,
-            "status": status.status.value,
-        },
-    )
+    log.info("job_status_ok", extra={"user_id": user_id, "job_id": job_id, "status": status.status.value})
     return status
 
 
@@ -144,7 +157,7 @@ async def get_job_status(
         403: {"description": "Caller does not own the job"},
         404: {"description": "Job not found"},
         409: {"description": "Job already in a terminal state"},
-        502: {"description": "Upstream Slurm error"},
+        502: {"description": "Upstream error"},
     },
 )
 async def cancel_job(
@@ -156,18 +169,17 @@ async def cancel_job(
     user_id: str = Depends(get_user_id),
     bearer_token: str = Depends(get_bearer_token),
     monitor: JobMonitor = Depends(get_job_monitor),
+    executor: LocalExecutor = Depends(get_local_executor),
+    settings: Settings = Depends(get_settings),
 ) -> JobCancellationResponse:
-    log.info(
-        "job_cancel_received",
-        extra={"user_id": user_id, "job_id": job_id, "reason": reason.value},
-    )
+    log.info("job_cancel_received", extra={"user_id": user_id, "job_id": job_id, "reason": reason.value})
     try:
-        await monitor.cancel_with_ownership(
-            job_id,
-            owner=user_id,
-            bearer_token=bearer_token,
-            reason=reason,
-        )
+        if settings.execution_mode == "local":
+            await executor.cancel(job_id, owner=user_id, reason=reason)
+        else:
+            await monitor.cancel_with_ownership(
+                job_id, owner=user_id, bearer_token=bearer_token, reason=reason,
+            )
     except JobOwnershipError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except JobAlreadyTerminalError as exc:

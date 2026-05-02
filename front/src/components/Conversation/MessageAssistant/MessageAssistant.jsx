@@ -13,6 +13,8 @@ import { useToast } from "../../../hooks/useToast";
 import FeedbackButtons from "./FeedbackButtons";
 import ForkButton from "./ForkButton";
 import AgentActivityFeed from "./AgentActivityFeed";
+import GooseTerminalRenderer from "./GooseTerminalRenderer";
+import { isChatAiAgentModel } from "../../../constants/chatAiAgentModels";
 import { useTranslation } from "react-i18next";
 
 // Constants
@@ -264,6 +266,9 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
   const isContentEmpty = !content.trim();
   const agentActivities = message?.agentActivities ?? [];
   const hasAgentUi = agentActivities.length > 0;
+  const isAgentMessage =
+    message?.agentActivities !== undefined ||
+    isChatAiAgentModel(localState?.settings?.model);
 
   const toggleAgentActivity = useCallback(
     (activityId) => {
@@ -442,9 +447,17 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
                   onToggleExpand={toggleAgentActivity}
                 />
               )}
-              <MarkdownRenderer isLoading={loading} renderMode={renderMode}>
-                {message.content[0]?.text}
-              </MarkdownRenderer>
+              {isAgentMessage ? (
+                <GooseTerminalRenderer
+                  text={message.content[0]?.text}
+                  isLoading={loading}
+                  renderMode={renderMode}
+                />
+              ) : (
+                <MarkdownRenderer isLoading={loading} renderMode={renderMode}>
+                  {message.content[0]?.text}
+                </MarkdownRenderer>
+              )}
               {/* Attachments Section */}
               {Array.isArray(message?.content) && message?.content.length > 1 && (
                 <div className="flex flex-wrap gap-2 pr-1 pb-1 max-h-24 sm:max-h-28 md:max-h-40 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800">

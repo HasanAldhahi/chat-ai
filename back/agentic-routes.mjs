@@ -129,7 +129,7 @@ export async function proxyAgentChatPost(req, res, options) {
     }
 
     const json = await response.json();
-    return res.status(200).json(json);
+    return res.status(response.status).json(json);
   } catch (err) {
     (options.logger || console).error("POST agent chat proxy error:", err);
     const name = err && err.name;
@@ -207,6 +207,52 @@ export async function proxyAgentSseGet(req, res, options) {
   }
 }
 
+/**
+ * DELETE /api/agent/sessions/:session_id → broker DELETE /api/agent/sessions/{session_id}
+ * Called by the front-end Stop button to cancel the running agent job.
+ */
+export async function proxyAgentSessionDelete(req, res, options) {
+  const { brokerUrl, fetchImpl = fetch } = options;
+  const sessionId = req.params.session_id;
+  if (!sessionId) {
+    return res.status(422).json({ error: "session_id param required" });
+  }
+  const xUser = resolveXUser(req);
+  if (!xUser) {
+    return res.status(401).json({
+      error: "Authentication required. Please log in again.",
+      code: "agentic_auth_required",
+    });
+  }
+  const url = `${brokerUrl.replace(/\/$/, "")}/api/agent/sessions/${encodeURIComponent(sessionId)}`;
+  try {
+    const response = await fetchImpl(url, {
+      method: "DELETE",
+      headers: {
+        "X-User": xUser,
+        ...(req.headers.authorization
+          ? { Authorization: req.headers.authorization }
+          : {}),
+      },
+    });
+    if (!response.ok) {
+      let detail = {};
+      try { detail = await response.json(); } catch { /* ignore */ }
+      return res
+        .status(mapAgenticStatus(response.status))
+        .json({ error: detail.detail || detail.error || "cancel failed" });
+    }
+    const json = await response.json();
+    return res.status(200).json(json);
+  } catch (err) {
+    (options.logger || console).error("DELETE agent session proxy error:", err);
+    return res.status(503).json({
+      error: "Agent service temporarily unavailable.",
+      code: "agentic_unavailable",
+    });
+  }
+}
+
 export function registerAgenticRoutes(app, options) {
   const opts = {
     fetchImpl: fetch,
@@ -218,5 +264,8 @@ export function registerAgenticRoutes(app, options) {
   );
   app.get("/api/chat/agent/sse", (req, res) =>
     proxyAgentSseGet(req, res, opts),
+  );
+  app.delete("/api/agent/sessions/:session_id", (req, res) =>
+    proxyAgentSessionDelete(req, res, opts),
   );
 }

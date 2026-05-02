@@ -119,7 +119,7 @@ If you wish to avoid using different ports for the `front` and `back` services, 
 If you wish to customize the list of available models, you must create a path that returns an OpenAI-style JSON response containing the model ids and names, and set the `modelsPath` in `front.json` accordingly. If configured correctly, your custom list will be displayed in the dropdown menu in the interface, instead of the list from your API provider.
 
 ## Development
-You can use docker as local development setup. Alternatively, you can run Chat AI directly for which you nee `nodejs` installed.
+You can use docker as local development setup. Alternatively, you can run Chat AI directly for which you need `nodejs` and (for the agentic layer) `python` >= 3.11 installed.
 
 To start the backend, run:
 ```bash
@@ -138,6 +138,19 @@ npm i
 # then run with
 npm run dev
 ```
+
+To start the agentic broker (FastAPI session broker on port 8001 — required for the agent chat features), run in a third terminal:
+```bash
+cd agentic
+# one-time setup
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+# then run with (port 8001 must match AGENTIC_BROKER_URL in back/)
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+The Node `back` service proxies `/api/agent/*` to `http://127.0.0.1:8001` by default. Override with `AGENTIC_BROKER_URL` if the broker runs elsewhere.
 
 [See CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute to this project.
 

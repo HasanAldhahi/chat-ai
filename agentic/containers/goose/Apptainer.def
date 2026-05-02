@@ -16,15 +16,18 @@ Stage: build
 
 %files
     ../../goose_runtime /opt/agentic/goose_runtime
+    ../../openhands_runtime /opt/agentic/openhands_runtime
     entrypoint.sh /opt/agentic/entrypoint.sh
 
 %post
     set -eux
     export DEBIAN_FRONTEND=noninteractive
     export PATH=/usr/local/bin:/usr/bin:/bin
+    # Unset GWDG proxy baked into base %environment — unreachable outside GWDG.
+    unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
 
     apt-get update -qq
-    apt-get install -y --no-install-recommends bash bzip2 ca-certificates curl
+    apt-get install -y --no-install-recommends bash bzip2 ca-certificates curl libgomp1
     rm -rf /var/lib/apt/lists/*
 
     chmod +x /opt/agentic/entrypoint.sh
