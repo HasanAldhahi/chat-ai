@@ -9,6 +9,7 @@ import AttachButton from "./AttachButton";
 import AttachMediaButton from "./AttachMediaButton";
 import ClearButton from "./ClearButton";
 import PromptTextArea from "./PromptTextArea";
+import SlashCommandPalette from "./SlashCommandPalette";
 
 import { useSendMessage } from "../../hooks/useSendMessage";
 import { useDebounce } from "../../hooks/useDebounce";
@@ -16,7 +17,8 @@ import { useDebounce } from "../../hooks/useDebounce";
 export default function Prompt({
   localState,
   setLocalState,
-}) { 
+  modelsData,
+}) {
   const sendMessage = useSendMessage();
   const [shouldSend, setShouldSend] = useState(false);
   const [ignoreChanges, setIgnoreChanges] = useState(false);
@@ -93,6 +95,14 @@ export default function Prompt({
           setLocalState={setLocalState}
         />
         <div className={`flex flex-col gap-4 w-full relative select-none rounded-2xl shadow-lg dark:text-white text-black bg-white dark:bg-bg_secondary_dark`} >
+          {/* Slash command palette — floats above textarea */}
+          <SlashCommandPalette
+            prompt={prompt}
+            onDone={(val) => { setPrompt(val); savePrompt(val, { clearChoices: false }); }}
+            localState={localState}
+            setLocalState={setLocalState}
+            modelsData={modelsData}
+          />
           {/* Prompt Text Area */}
           <PromptTextArea
             localState={localState}
