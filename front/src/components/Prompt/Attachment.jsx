@@ -17,6 +17,7 @@ import {
 import { FileWarning } from "lucide-react";
 import { processFile } from "../../apis/processFile";
 import { getFileType } from "../../utils/attachments";
+import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
 import { useToast } from "../../hooks/useToast";
 
 export default function Attachment({
@@ -118,7 +119,9 @@ export default function Attachment({
   };
 
   const badge = getFileBadge(file);
-  const canProcess = !inHistory && fileType === "pdf"; // TODO add excel and other supported types
+  // Agent models receive files via workspace upload — no manual processing needed.
+  const isAgentModel = isChatAiAgentModel(localState.settings.model);
+  const canProcess = !inHistory && !isAgentModel && fileType === "pdf";
 
   const getFileDisplayInfo = (file) => {
     if (canProcess) {
@@ -381,7 +384,7 @@ export default function Attachment({
             </div>
           </div>
           {/* Process Needed Warning*/}
-          {!inAssistant && (!isFileSupported || fileType === "pdf") && (
+          {!inAssistant && !isAgentModel && (!isFileSupported || fileType === "pdf") && (
             <span className="text-[11px] text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
               <svg
                 xmlns="http://www.w3.org/2000/svg"

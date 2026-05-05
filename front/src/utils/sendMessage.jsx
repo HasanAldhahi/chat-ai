@@ -18,6 +18,8 @@ import generateChoiceProposal from "../apis/generateChoiceProposal";
 import generateTitle from "../apis/generateTitle";
 import { loadFile, loadFileMeta, saveFile, updateConversation, updateConversationMeta } from "../db";
 import { getFileType, readFileAsBase64, readFileAsText } from "./attachments";
+import { processFile } from "../apis/processFile";
+import { uploadAgentFile } from "./uploadAgentFile";
 
 // Text to be appended to system prompt for memories
 const memoryExplanation = "The following list of memories was gathered by the system from previous conversations and may be irrelevant now. You may refer to relevant items only if justified to provide a more personalized and contextual response. Do not make any assumptions based on memories, instead focus on the user messages and requests:"
@@ -99,8 +101,18 @@ export async function processContentItems({
         });
       }
       else if (convertDocs) {
-        if (fileType === "pdf") {
-          // Shouldn't send unprocessed PDF file
+        if (fileType === "pdf" || fileType === "excel" || fileType === "docx") {
+          // Convert binary document to markdown via /documents endpoint
+          try {
+            const result = await processFile(file);
+            if (result.success && result.content) {
+              output.push({ type: "text", text: result.content });
+            } else {
+              console.warn(`Failed to process document ${meta.name}: ${result.error}`);
+            }
+          } catch (error) {
+            console.warn(`Error processing document ${meta.name}: ${error}`);
+          }
           continue;
         }
         // Try to add file as text
@@ -307,23 +319,30 @@ const sendMessage = async ({
     }
     const _isAgentTurn = isChatAiAgentModel(localState.settings.model);
     // Pushing message into conversation history
-    setLocalState((prev) => ({
-      ...prev,
-      // Add two new placeholder messages
-      messages: [
-        ...prev.messages,
-        {
-          role: "assistant",
-          content: [{ type: "text", text: ""}],
-          loading: true,
-          // Mark agent messages so GooseTerminalRenderer is used from the start
-          ...(_isAgentTurn ? { agentActivities: [] } : {}),
-        },
-        { role: "user", content: [{ type: "text", text: "" }] },
-      ],
-      hasFirstPrompt: true,
-      flush: true // Save to DB immediately
-    }));
+    setLocalState((prev) => {
+      // Clear any stale loading states from previous in-flight requests so they
+      // don't stay stuck when the user sends a new message before the last one
+      // resolves (the old async202Promise will never resolve once its SSE is aborted).
+      const clearedMessages = prev.messages.map((msg) =>
+        msg.role === "assistant" && msg.loading ? { ...msg, loading: false } : msg
+      );
+      return {
+        ...prev,
+        messages: [
+          ...clearedMessages,
+          {
+            role: "assistant",
+            content: [{ type: "text", text: ""}],
+            loading: true,
+            // Mark agent messages so GooseTerminalRenderer is used from the start
+            ...(_isAgentTurn ? { agentActivities: [] } : {}),
+          },
+          { role: "user", content: [{ type: "text", text: "" }] },
+        ],
+        hasFirstPrompt: true,
+        flush: true,
+      };
+    });
 
     // Stream assistant response into localState
     async function getChatChunk(conversationId, messageId = null) {
@@ -333,22 +352,42 @@ const sendMessage = async ({
       // For async-202 agent sessions, resolve this promise when SSE signals completion.
       let resolveAsync202 = null;
       const async202Promise = new Promise((resolve) => { resolveAsync202 = resolve; });
+      // Once resolved, gate further onFrame updates so parallel Goose jobs
+      // don't re-set loading=true or overwrite the finished bubble.
+      let agentResolved = false;
+      let disposeSSE = null;
+
+      const resolveAgent = (payload) => {
+        if (agentResolved) return;
+        agentResolved = true;
+        resolveAsync202?.(payload);
+        // Close SSE so events from parallel Goose jobs stop arriving.
+        disposeSSE?.();
+      };
 
       if (isChatAiAgentModel(modelForAgent) && conversationId) {
-        startAgentBrokerSse({
+        disposeSSE = startAgentBrokerSse({
           sessionId: conversationId,
           signal: getActiveRequestSignal(),
+          onStreamEnd: () => {
+            // Goose process exited — SSE stream closed. Finalize the bubble now
+            // so all message events that arrived before stream-end are visible.
+            resolveAgent({ answer: currentContent, usage: null });
+          },
           onFrame: (frame) => {
             if (!isAgentSseEventName(frame.event)) return;
 
             // message: goose stdout line → append to bubble text, no activity row
             if (frame.event === "message") {
+              if (agentResolved) return; // response already finalised
               const raw = frame.data?.text || "";
-              // Filter out goose ASCII art / session banner lines
+              // Filter out goose ASCII art / session banner / prompt-echo lines
               const isHeader = /^[\s_\\/<>()\|L*●·\-]+$/.test(raw)
                 || raw.includes("goose is ready")
                 || raw.includes("new session")
-                || /^\s*\w+\)\s+\d{8}_\d+\s*·/.test(raw); // e.g. "____) 20260501_4 · /workspace"
+                || /^\s*\w+\)\s+\d{8}_\d+/.test(raw)   // "____) 20260501_4 · /workspace"
+                || /^\s*\(\s*[A-Z]\s*\)\s*>/.test(raw) // "( G )> " interactive prompt
+                || /^\s*$/.test(raw);                   // blank lines
               if (raw && !isHeader) {
                 currentContent[0].text += raw + "\n";
                 setLocalState((prev) => {
@@ -366,6 +405,7 @@ const sendMessage = async ({
 
             // assistant.delta: stream partial text into bubble
             if (frame.event === "assistant.delta") {
+              if (agentResolved) return;
               const chunk = frame.data?.text || "";
               if (chunk) {
                 currentContent[0].text += chunk;
@@ -386,21 +426,21 @@ const sendMessage = async ({
             if (frame.event === "assistant.final") {
               const text = frame.data?.text;
               if (typeof text === "string") currentContent[0].text = text;
-              resolveAsync202?.({ answer: currentContent, usage: null });
+              resolveAgent({ answer: currentContent, usage: null });
               return;
             }
 
             if (frame.event === "result") {
-              // If no assistant output arrived, surface the tool output as text
-              if (!currentContent[0].text && frame.data?.output) {
-                currentContent[0].text = String(frame.data.output);
-              }
-              resolveAsync202?.({ answer: currentContent, usage: null });
-              // fall through to add one terminal activity row
+              // Tool call completed — do NOT resolve the agent yet; Goose may
+              // still write its final text response after this.
+              // fall through to add one activity row
             }
 
             if (frame.event === "error") {
-              resolveAsync202?.({ answer: currentContent, usage: null });
+              // Terminal error — resolve now so the UI doesn't spin forever.
+              const firstError = !agentResolved;
+              resolveAgent({ answer: currentContent, usage: null });
+              if (!firstError) return; // duplicate error — skip activity row
               // fall through to add one error activity row
             }
 
@@ -653,6 +693,45 @@ const sendMessage = async ({
       return {
         answer: currentContent,
         usage
+      }
+    }
+
+    // For agent turns: upload any attached files to the session workspace so
+    // Goose can read them directly. Inject file paths into the prompt text.
+    if (_isAgentTurn) {
+      const lastMsg = localState.messages[localState.messages.length - 1];
+      const fileItems = (lastMsg?.content || []).filter(
+        (item) => item.type === "file" && item.fileId
+      );
+      if (fileItems.length > 0) {
+        const uploaded = [];
+        for (const item of fileItems) {
+          try {
+            const file = await loadFile(item.fileId);
+            if (!file) continue;
+            const result = await uploadAgentFile(conversationId, file);
+            uploaded.push({ name: file.name, path: result.path });
+          } catch (err) {
+            console.warn("Failed to upload file to agent workspace:", err);
+          }
+        }
+        if (uploaded.length > 0) {
+          const note =
+            "\n\nFiles uploaded to your workspace:\n" +
+            uploaded.map((f) => `- ${f.name} → ${f.path}`).join("\n");
+          const msgs = conversationForAPI.messages;
+          const lastIdx = msgs.length - 1;
+          if (msgs[lastIdx]?.role === "user") {
+            const c = msgs[lastIdx].content;
+            if (typeof c === "string") {
+              msgs[lastIdx] = { ...msgs[lastIdx], content: c + note };
+            } else if (Array.isArray(c)) {
+              const txt = c.find((x) => x.type === "text");
+              if (txt) txt.text += note;
+              else c.unshift({ type: "text", text: note });
+            }
+          }
+        }
       }
     }
 

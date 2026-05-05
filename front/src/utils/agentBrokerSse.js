@@ -96,6 +96,7 @@ export function startAgentBrokerSse({
   signal,
   onFrame,
   onConnectionError,
+  onStreamEnd,
 }) {
   if (!sessionId || !signal) return () => {};
 
@@ -132,6 +133,8 @@ export function startAgentBrokerSse({
       }
       if (!res.body) return;
       await readAgentSseBody(res.body, controller.signal, onFrame);
+      // Stream closed normally — Goose process exited.
+      if (!controller.signal.aborted) onStreamEnd?.();
     } catch (err) {
       if (err?.name === "AbortError") return;
       onConnectionError?.(err);

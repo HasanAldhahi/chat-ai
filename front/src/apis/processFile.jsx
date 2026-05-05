@@ -1,26 +1,36 @@
-// PDF processing function
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+
+async function extractPdfText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item) => item.str).join(" ");
+    pages.push(pageText);
+  }
+  return pages.join("\n\n");
+}
+
 export const processFile = async (file) => {
   try {
-    const formData = new FormData();
-    formData.append("document", file);
+    const fileType = file.type?.toLowerCase() || "";
+    let text = "";
 
-    const response = await fetch(
-      import.meta.env.VITE_BACKEND_ENDPOINT + "/documents",
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (fileType === "application/pdf" || file.name?.toLowerCase().endsWith(".pdf")) {
+      text = await extractPdfText(file);
+    } else {
+      // Fallback: read as plain text (covers txt, md, csv, code, etc.)
+      text = await file.text();
     }
-
-    const data = await response.json();
 
     return {
       success: true,
-      content: data.markdown,
+      content: text,
       error: null,
     };
   } catch (error) {
@@ -33,7 +43,6 @@ export const processFile = async (file) => {
   }
 };
 
-// Keep these for backward compatibility if needed
 export const processPdfDocument = processFile;
 export const processExcelDocument = processFile;
 export const processDocxDocument = processFile;
