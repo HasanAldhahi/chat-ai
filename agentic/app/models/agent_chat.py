@@ -26,5 +26,9 @@ class AgentChatRequest(BaseModel):
         default=None,
         description="Optional explicit user id; defaults to X-User header",
     )
+    llm_model: Optional[str] = Field(
+        default=None,
+        description="LLM model ID to use inside the agent runtime (e.g. apertus-70b-instruct-2509). Falls back to server default when omitted.",
+    )
 
     model_config = {"extra": "ignore"}

@@ -94,15 +94,7 @@ export default function Prompt({
           localState={localState}
           setLocalState={setLocalState}
         />
-        <div className={`flex flex-col gap-4 w-full relative select-none rounded-2xl shadow-lg dark:text-white text-black bg-white dark:bg-bg_secondary_dark`} >
-          {/* Slash command palette — floats above textarea */}
-          <SlashCommandPalette
-            prompt={prompt}
-            onDone={(val) => { setPrompt(val); savePrompt(val, { clearChoices: false }); }}
-            localState={localState}
-            setLocalState={setLocalState}
-            modelsData={modelsData}
-          />
+        <div className={`flex flex-col w-full relative select-none rounded-2xl shadow-lg dark:text-white text-black bg-white dark:bg-bg_secondary_dark`} >
           {/* Prompt Text Area */}
           <PromptTextArea
             localState={localState}
@@ -110,6 +102,14 @@ export default function Prompt({
             handleSend={handleSend}
             handleChange={handleChange}
             prompt={prompt}
+          />
+          {/* Slash command palette — renders between textarea and buttons */}
+          <SlashCommandPalette
+            prompt={prompt}
+            onDone={(val) => { setPrompt(val); savePrompt(val, { clearChoices: false }); }}
+            localState={localState}
+            setLocalState={setLocalState}
+            modelsData={modelsData}
           />
           {/* Buttons Section */}
           <div className="px-3 py-2 w-full h-fit flex justify-between items-center bg-white dark:bg-bg_secondary_dark rounded-b-2xl relative">

@@ -97,6 +97,7 @@ async def agent_chat(
                 session_id=session_id,
                 user_id=user_id,
                 model_id=body.model,
+                llm_model=body.llm_model,
                 prompt=prompt,
                 bearer_token=request.headers.get("Authorization", "").removeprefix("Bearer ").strip(),
                 executor=backend,

@@ -55,7 +55,13 @@ async def _stream_lines(reader: asyncio.StreamReader) -> AsyncIterator[str]:
 def _build_goose_argv(settings: cfg_module.GooseSettings) -> List[str]:
     if settings.dev_command_override.strip():
         return shlex.split(settings.dev_command_override)
-    return [settings.goose_cli, *shlex.split(settings.run_extra), "-t", settings.session_prompt]
+    prompt = settings.session_prompt
+    if settings.session_prompt_file:
+        try:
+            prompt = Path(settings.session_prompt_file).read_text(encoding="utf-8")
+        except OSError:
+            pass
+    return [settings.goose_cli, *shlex.split(settings.run_extra), "-t", prompt]
 
 
 def _build_goose_env(settings: cfg_module.GooseSettings) -> dict:

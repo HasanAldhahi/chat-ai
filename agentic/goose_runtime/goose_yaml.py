@@ -7,7 +7,15 @@ from pathlib import Path
 
 
 def chat_ai_extensions_block(mcp_rpc_url: str) -> str:
-    """Return YAML config for goose: platform extensions + bundled MCP + chat-ai-mcp."""
+    """Return YAML config for goose: minimal platform extensions + chat-ai-mcp only.
+
+    Keeping the extension set small is intentional:
+    - Fewer tools = shorter system prompt = faster LLM response (critical for
+      models like Qwen3-30B that think before acting).
+    - The heavy stdio servers (memory, computercontroller) each spawn a goose
+      subprocess, adding ~1 s startup latency and extra context tokens.
+    - developer + todo cover the core agentic use-case (code + task tracking).
+    """
     escaped = json.dumps(mcp_rpc_url)
     return f"""extensions:
   # --- Platform extensions (built into the goose binary) -------------------
@@ -19,14 +27,6 @@ def chat_ai_extensions_block(mcp_rpc_url: str) -> str:
     display_name: Developer
     bundled: true
     available_tools: []
-  analyze:
-    enabled: true
-    type: platform
-    name: analyze
-    description: 'Analyze code structure with tree-sitter: directory overviews, file details, symbol call graphs'
-    display_name: Analyze
-    bundled: true
-    available_tools: []
   todo:
     enabled: true
     type: platform
@@ -35,40 +35,6 @@ def chat_ai_extensions_block(mcp_rpc_url: str) -> str:
     display_name: Todo
     bundled: true
     available_tools: []
-  summarize:
-    enabled: true
-    type: platform
-    name: summarize
-    description: Load files/directories and get an LLM summary in a single call
-    display_name: Summarize
-    bundled: true
-    available_tools: []
-
-  # --- Bundled MCP servers (goose mcp <name>) ------------------------------
-  memory:
-    enabled: true
-    type: stdio
-    name: memory
-    display_name: Memory
-    description: Persistent key-value memory across agent turns
-    cmd: goose
-    args:
-      - mcp
-      - memory
-    timeout: 300
-    envs: {{}}
-  computercontroller:
-    enabled: true
-    type: stdio
-    name: computercontroller
-    display_name: Computer Controller
-    description: Read and write PDF, DOCX, XLSX files; automate desktop interactions
-    cmd: goose
-    args:
-      - mcp
-      - computercontroller
-    timeout: 300
-    envs: {{}}
 
   # --- Chat AI MCP (stdio → HTTP bridge to broker's /rpc) ------------------
   chat-ai-mcp:

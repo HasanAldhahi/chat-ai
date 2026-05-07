@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
 
 const COMMANDS = [
   { name: "model",  description: "Switch the active model" },
-  { name: "tokens", description: "Show token usage for this conversation" },
+  { name: "usage",  description: "Show token usage for this conversation" },
 ];
 
 function estimateTokens(messages) {
@@ -30,9 +31,10 @@ export default function SlashCommandPalette({
   const query   = prompt.startsWith("/") ? prompt.slice(1).toLowerCase() : "";
   const filtered = COMMANDS.filter((c) => c.name.startsWith(query));
 
-  const currentModel  = localState?.settings?.model;
-  const tokenEstimate = estimateTokens(localState?.messages);
-  const msgCount      = (localState?.messages ?? []).filter((m) => m.role !== "system").length;
+  const currentModel     = localState?.settings?.model;
+  const activeGooseModel = localState?.settings?.goose_model;
+  const tokenEstimate    = estimateTokens(localState?.messages);
+  const msgCount         = (localState?.messages ?? []).filter((m) => m.role !== "system").length;
 
   // Stay visible while in a sub-mode even if prompt no longer starts with "/"
   const isVisible = prompt.startsWith("/") || mode !== "commands";
@@ -47,15 +49,17 @@ export default function SlashCommandPalette({
     if (prompt === "") { setMode("commands"); setActiveIdx(0); }
   }, [prompt]);
 
+  const llmModels = (modelsData ?? []).filter((m) => !isChatAiAgentModel(m));
+
   const selectCommand = (cmd) => {
-    if (cmd.name === "model")  { setMode("models");  setActiveIdx(0); }
-    if (cmd.name === "tokens") { setMode("tokens"); }
+    if (cmd.name === "model") { setMode("models"); setActiveIdx(0); }
+    if (cmd.name === "usage") { setMode("tokens"); }
   };
 
   const selectModel = (model) => {
     setLocalState((prev) => ({
       ...prev,
-      settings: { ...prev.settings, model },
+      settings: { ...prev.settings, goose_model: model },
     }));
     onDone("");
   };
@@ -64,7 +68,7 @@ export default function SlashCommandPalette({
   useEffect(() => {
     if (!isVisible) return;
 
-    const items = mode === "models" ? (modelsData ?? []) : filtered;
+    const items = mode === "models" ? llmModels : filtered;
 
     const onKey = (e) => {
       if (e.key === "Escape") {
@@ -84,8 +88,8 @@ export default function SlashCommandPalette({
         e.stopPropagation();
         if (mode === "commands" && filtered[activeIdx]) {
           selectCommand(filtered[activeIdx]);
-        } else if (mode === "models" && modelsData?.[activeIdx]) {
-          selectModel(modelsData[activeIdx]);
+        } else if (mode === "models" && llmModels[activeIdx]) {
+          selectModel(llmModels[activeIdx]);
         } else if (mode === "tokens") {
           onDone("");
           setMode("commands");
@@ -95,12 +99,12 @@ export default function SlashCommandPalette({
 
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [isVisible, mode, activeIdx, filtered, modelsData]);
+  }, [isVisible, mode, activeIdx, filtered, llmModels]);
 
   if (!isVisible) return null;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-2 z-50 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-bg_secondary_dark shadow-xl overflow-hidden">
+    <div className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-bg_secondary_dark shadow-md overflow-hidden mx-0">
       {mode === "tokens" && (
         <div className="p-4 text-sm">
           <div className="flex items-center gap-2 mb-3">
@@ -119,9 +123,15 @@ export default function SlashCommandPalette({
               <span className="font-mono font-semibold text-gray-900 dark:text-white">{msgCount}</span>
             </div>
             <div className="flex justify-between">
-              <span>Active model</span>
+              <span>Agent</span>
               <span className="font-mono font-semibold text-gray-900 dark:text-white truncate ml-4 max-w-[60%] text-right">
                 {currentModel?.name ?? currentModel?.id ?? "—"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Goose model</span>
+              <span className="font-mono font-semibold text-gray-900 dark:text-white truncate ml-4 max-w-[60%] text-right">
+                {activeGooseModel?.name ?? activeGooseModel?.id ?? "server default"}
               </span>
             </div>
           </div>
@@ -139,10 +149,10 @@ export default function SlashCommandPalette({
           <div className="px-3 py-2 text-xs font-medium text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white dark:bg-bg_secondary_dark">
             Select model  <span className="font-normal opacity-60">↑↓ navigate · Enter select · Esc cancel</span>
           </div>
-          {(modelsData ?? []).length === 0 && (
+          {llmModels.length === 0 && (
             <div className="px-4 py-3 text-sm text-gray-400">No models available</div>
           )}
-          {(modelsData ?? []).map((model, i) => (
+          {llmModels.map((model, i) => (
             <button
               key={model.id}
               onClick={() => selectModel(model)}
@@ -156,10 +166,10 @@ export default function SlashCommandPalette({
                 i === activeIdx
                   ? "text-purple-700 dark:text-purple-300"
                   : "text-gray-700 dark:text-gray-200"
-              } ${model.id === currentModel?.id ? "font-semibold" : ""}`}>
+              } ${model.id === activeGooseModel?.id ? "font-semibold" : ""}`}>
                 {model.name ?? model.id}
               </span>
-              {model.id === currentModel?.id && (
+              {model.id === activeGooseModel?.id && (
                 <span className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300">
                   active
                 </span>

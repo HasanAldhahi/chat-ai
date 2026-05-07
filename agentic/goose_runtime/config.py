@@ -38,6 +38,10 @@ class GooseSettings(BaseSettings):
         default="Summarize the workspace in one sentence.",
         description="Headless task text passed to `goose run -t`.",
     )
+    session_prompt_file: str = Field(
+        default="",
+        description="Path to a file containing the prompt (overrides session_prompt when set).",
+    )
     home_dir: str = Field(
         default="/workspace",
         description="writable HOME so ~/.config/goose can live on the bind-mount",

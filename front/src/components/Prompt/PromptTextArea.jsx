@@ -3,8 +3,9 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useToast } from "../../hooks/useToast";
-
 import { useAttachments } from "../../hooks/useAttachments";
+import { isChatAiAgentModel } from "../../constants/chatAiAgentModels";
+import { uploadAgentFile } from "../../utils/uploadAgentFile";
 
 const MAX_HEIGHT = 200;
 const MIN_HEIGHT = 56;
@@ -37,15 +38,39 @@ export default function PromptTextArea({
     }
   };
 
-  // Handle file drop events for images and videos
+  // Handle file drop events — upload to agent workspace when in Goose mode
   const handleDrop = async (e) => {
     e.preventDefault();
+    setIsDragging(false);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+
+    if (isChatAiAgentModel(localState?.settings?.model) && droppedFiles.length > 0) {
+      const sessionId = localState?.id;
+      const uploaded = [];
+      const failed = [];
+      for (const file of droppedFiles) {
+        try {
+          const result = await uploadAgentFile(sessionId, file);
+          uploaded.push(result);
+          notifySuccess(`Uploaded ${result.name} → ${result.path}`);
+        } catch (err) {
+          failed.push(file.name);
+          notifyError(`Failed to upload ${file.name}: ${err.message}`);
+        }
+      }
+      if (uploaded.length > 0) {
+        const paths = uploaded.map((u) => u.path).join(", ");
+        const note = `\n[Attached file${uploaded.length > 1 ? "s" : ""}: ${paths}]`;
+        handleChange({ target: { value: (prompt || "") + note } });
+      }
+      return;
+    }
+
     addAttachments({
       localState,
       setLocalState,
-      selectedFiles: Array.from(e.dataTransfer.files),
+      selectedFiles: droppedFiles,
     });
-    setIsDragging(false);
   };
   
   // Handle pasting images from clipboard

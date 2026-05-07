@@ -56,6 +56,7 @@ class AgentOrchestrator:
         session_id: str,
         user_id: str,
         model_id: str,
+        llm_model: str | None = None,
         prompt: str,
         bearer_token: str = "",
         executor=None,   # LocalExecutor | SlurmClient — injected by router
@@ -99,6 +100,7 @@ class AgentOrchestrator:
                 spec=spec,
                 session_id=session_id,
                 user_id=user_id,
+                llm_model=llm_model,
                 prompt=prompt,
                 bearer_token=bearer_token,
                 executor=executor,
@@ -135,6 +137,7 @@ class AgentOrchestrator:
         spec: RuntimeSpec,
         session_id: str,
         user_id: str,
+        llm_model: str | None = None,
         prompt: str,
         bearer_token: str,
         executor,
@@ -154,7 +157,7 @@ class AgentOrchestrator:
             env.setdefault("OPENAI_BASE_URL", self._settings.vllm_base_url.rstrip("/"))
             env.setdefault("OPENAI_API_KEY", self._settings.vllm_api_key or "local")
             env.setdefault("GOOSE_PROVIDER", "openai")
-            env.setdefault("GOOSE_MODEL", self._settings.vllm_model)
+            env.setdefault("GOOSE_MODEL", llm_model or self._settings.vllm_model)
         # For local dev without vLLM, forward any GOOSE_*/ANTHROPIC_*/OPENAI_* vars already
         # present in the broker's own environment so the runtime inherits them.
         import os as _os

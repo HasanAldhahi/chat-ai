@@ -263,8 +263,17 @@ class LocalExecutor:
                 req.container_image,
             ]
             # Inject env as APPTAINERENV_* so apptainer exports them inside.
+            # GOOSE_SESSION_PROMPT is excluded here — arbitrary user text breaks
+            # Apptainer's shell-based /.inject-apptainer-env.sh when it contains
+            # parentheses or other shell-special chars. Write to a file instead.
+            prompt_text = req.environment.get("GOOSE_SESSION_PROMPT", "")
+            prompt_file = Path(session_workspace) / "prompt.txt"
+            prompt_file.write_text(prompt_text, encoding="utf-8")
             for k, v in req.environment.items():
+                if k in ("GOOSE_SESSION_PROMPT", "APPTAINERENV_GOOSE_SESSION_PROMPT"):
+                    continue
                 env[f"APPTAINERENV_{k}"] = v
+            env["APPTAINERENV_GOOSE_SESSION_PROMPT_FILE"] = "/workspace/prompt.txt"
             env.setdefault("APPTAINERENV_GOOSE_MCP_UVICORN_PORT", str(mcp_port))
             env.setdefault("APPTAINERENV_GOOSE_MCP_SERVER_URL", f"http://127.0.0.1:{mcp_port}")
             # Extend PYTHONPATH so the vendor packages (ddgs etc.) are importable.

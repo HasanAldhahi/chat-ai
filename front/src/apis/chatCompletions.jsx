@@ -47,6 +47,9 @@ async function* agentChatCompletions(conversation, timeout = 30000, hooks = {}) 
     stream: true,
     temperature: conversation.settings.temperature ?? 0.5,
     top_p: conversation.settings.top_p ?? 0.5,
+    ...(conversation.settings.goose_model?.id
+      ? { llm_model: conversation.settings.goose_model.id }
+      : {}),
   };
 
   const xUser = resolveAgenticXUser();

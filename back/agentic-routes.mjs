@@ -253,6 +253,35 @@ export async function proxyAgentSessionDelete(req, res, options) {
   }
 }
 
+/**
+ * Proxy multipart file upload to broker POST /api/sessions/:session_id/files
+ * Streams the raw body through so we don't buffer the whole file in Node.
+ */
+export async function proxySessionFileUpload(req, res, options) {
+  const { brokerUrl, fetchImpl = fetch } = options;
+  const { session_id } = req.params;
+  const xUser = resolveXUser(req);
+  const brokerTarget = `${brokerUrl}/api/sessions/${encodeURIComponent(session_id)}/files`;
+  try {
+    const response = await fetchImpl(brokerTarget, {
+      method: "POST",
+      headers: {
+        ...req.headers,
+        host: undefined,
+        "x-user": xUser,
+      },
+      body: req,
+      duplex: "half",
+    });
+    res.status(response.status);
+    response.headers.forEach((v, k) => res.setHeader(k, v));
+    response.body.pipe(res);
+  } catch (err) {
+    (options.logger || console).error("POST session file upload proxy error:", err);
+    res.status(503).json({ error: "Agentic broker unavailable" });
+  }
+}
+
 export function registerAgenticRoutes(app, options) {
   const opts = {
     fetchImpl: fetch,
@@ -267,5 +296,8 @@ export function registerAgenticRoutes(app, options) {
   );
   app.delete("/api/agent/sessions/:session_id", (req, res) =>
     proxyAgentSessionDelete(req, res, opts),
+  );
+  app.post("/api/sessions/:session_id/files", (req, res) =>
+    proxySessionFileUpload(req, res, opts),
   );
 }
