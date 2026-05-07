@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from typing import AsyncIterator, List, Optional
 
+import httpx
+
 from openhands_runtime.launcher import wait_for_health
 from openhands_runtime.sse_forwarder import forward_stream
 
@@ -87,6 +89,28 @@ def _build_goose_env(settings: cfg_module.GooseSettings) -> dict:
     return env
 
 
+async def _post_status_event(
+    broker_sse_url: str,
+    session_id: str,
+    user_id: str,
+    message: str,
+    *,
+    timeout_s: float = 5.0,
+) -> None:
+    if not broker_sse_url:
+        return
+    url = broker_sse_url.rstrip("/") + f"/api/sse/{session_id}/events"
+    headers: dict = {"Content-Type": "application/json"}
+    if user_id:
+        headers["X-User"] = user_id
+    body = {"event": "action", "data": {"type": "system", "message": message}}
+    try:
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
+            await client.post(url, json=body, headers=headers, timeout=timeout_s)
+    except Exception:
+        pass
+
+
 async def _terminate(proc: asyncio.subprocess.Process, name: str, grace_s: float = 5.0) -> None:
     if proc.returncode is not None:
         return
@@ -124,6 +148,13 @@ async def run(settings: Optional[cfg_module.GooseSettings] = None) -> int:
 
     health_url = f"http://127.0.0.1:{port}/health"
 
+    await _post_status_event(
+        settings.broker_sse_url or "",
+        settings.session_id,
+        settings.user_id,
+        "Booting up isolated agent workspace...",
+    )
+
     mcp = await _start_mcp(port)
     ok = await wait_for_health(
         health_url,
@@ -139,6 +170,12 @@ async def run(settings: Optional[cfg_module.GooseSettings] = None) -> int:
         return 2
 
     log.info("mcp.ready")
+    await _post_status_event(
+        settings.broker_sse_url or "",
+        settings.session_id,
+        settings.user_id,
+        "Initializing Goose reasoning engine...",
+    )
 
     argv = _build_goose_argv(settings)
     proc = await asyncio.create_subprocess_exec(

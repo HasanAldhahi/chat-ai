@@ -128,6 +128,28 @@ def build_openhands_argv(settings: config.OpenHandsSettings) -> List[str]:
 # Child process plumbing                                                      #
 # --------------------------------------------------------------------------- #
 
+async def _post_status_event(
+    broker_sse_url: str,
+    session_id: str,
+    user_id: str,
+    message: str,
+    *,
+    timeout_s: float = 5.0,
+) -> None:
+    if not broker_sse_url:
+        return
+    url = broker_sse_url.rstrip("/") + f"/api/sse/{session_id}/events"
+    headers: Dict[str, str] = {"Content-Type": "application/json"}
+    if user_id:
+        headers["X-User"] = user_id
+    body = {"event": "action", "data": {"type": "system", "message": message}}
+    try:
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
+            await client.post(url, json=body, headers=headers, timeout=timeout_s)
+    except Exception:
+        pass
+
+
 async def _start_mcp_server(
     settings: config.OpenHandsSettings,
 ) -> asyncio.subprocess.Process:
@@ -204,6 +226,13 @@ async def run(settings: Optional[config.OpenHandsSettings] = None) -> int:
         },
     )
 
+    await _post_status_event(
+        settings.broker_sse_url or "",
+        settings.session_id,
+        settings.user_id,
+        "Booting up isolated agent workspace...",
+    )
+
     mcp = await _start_mcp_server(settings)
     health_url = settings.mcp_server_url.rstrip("/") + "/health"
     healthy = await wait_for_health(
@@ -217,6 +246,12 @@ async def run(settings: Optional[config.OpenHandsSettings] = None) -> int:
         return 2
 
     log.info("mcp.ready")
+    await _post_status_event(
+        settings.broker_sse_url or "",
+        settings.session_id,
+        settings.user_id,
+        "Initializing OpenHands reasoning engine...",
+    )
 
     oh = await _start_openhands(settings)
 
