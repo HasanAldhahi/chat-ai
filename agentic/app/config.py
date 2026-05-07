@@ -206,7 +206,7 @@ class Settings(BaseSettings):
         "acceptance criterion). Excess returns 429.",
     )
     sse_session_idle_timeout_s: float = Field(
-        default=300.0,
+        default=60.0,
         gt=0,
         description="Sessions with no subscribers and no publishes for "
         "this many seconds are evicted by the background reaper.",
@@ -214,7 +214,18 @@ class Settings(BaseSettings):
     sse_reaper_interval_s: float = Field(
         default=30.0,
         gt=0,
-        description="How often the idle-session reaper runs.",
+        description="How often the SSE idle-room reaper runs.",
+    )
+    agent_session_idle_timeout_s: float = Field(
+        default=60.0,
+        gt=0,
+        description="Seconds of inactivity (no subscribers + no events) "
+        "before a running agent job is cancelled.",
+    )
+    agent_session_reaper_interval_s: float = Field(
+        default=30.0,
+        gt=0,
+        description="How often the session reaper checks for idle agent jobs.",
     )
 
     # --- Auth (Task 1.7) ----------------------------------------------------

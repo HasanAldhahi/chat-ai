@@ -16,6 +16,7 @@ from app.logging_config import configure_logging
 from app.middleware.auth import AuthMiddleware
 from app.routers import admin, agent_chat, files, health, jobs, secrets, sse
 from app.services.auth import AuthService
+from app.services.session_reaper import SessionReaper
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -33,7 +34,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "slurm_mock_mode": settings.slurm_mock_mode,
             },
         )
+        reaper = SessionReaper(app, settings)
+        app.state.session_reaper = reaper
+        await reaper.start()
         yield
+        await reaper.aclose()
         monitor = getattr(app.state, "job_monitor", None)
         if monitor is not None:
             await monitor.aclose()
