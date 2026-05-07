@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from app.config import Settings
 from app.models.job import CancelReason, JobState, JobSubmissionRequest
@@ -107,6 +107,13 @@ class AgentOrchestrator:
             )
             self._sessions[key] = job_id
             return {"job_id": job_id, "session_id": session_id}
+
+    def active_sessions(self) -> List[Dict]:
+        """Point-in-time list of (session_id, user_id, job_id) for the admin endpoint."""
+        return [
+            {"session_id": sid, "user_id": uid, "job_id": job_id}
+            for (sid, uid), job_id in self._sessions.items()
+        ]
 
     async def cancel_session(
         self,

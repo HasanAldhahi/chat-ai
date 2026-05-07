@@ -144,6 +144,20 @@ class SseHub:
         room = self._rooms.get(session_id)
         return room.owner if room else None
 
+    def snapshot(self) -> List[Dict]:
+        """Point-in-time view of all SSE rooms for the admin status endpoint."""
+        now = time.monotonic()
+        return [
+            {
+                "session_id": sid,
+                "user_id": room.owner or "",
+                "sse_subscribers": len(room.subscribers),
+                "last_activity_s_ago": round(now - room.last_activity_ts, 1),
+                "total_published": room.total_published,
+            }
+            for sid, room in self._rooms.items()
+        ]
+
     async def touch_room(
         self, session_id: str, *, user_id: Optional[str] = None
     ) -> None:
