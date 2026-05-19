@@ -4,10 +4,10 @@ const SNIPPET = 400;
 
 function SystemSpinner() {
   return (
-    <span
-      className="inline-block w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"
-      aria-hidden="true"
-    />
+    <span className="relative flex h-2.5 w-2.5 shrink-0 mt-0.5" aria-hidden="true">
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
+    </span>
   );
 }
 
@@ -15,10 +15,7 @@ function formatTimestamp(ts) {
   try {
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return String(ts);
-    return d.toLocaleString(undefined, {
-      dateStyle: "short",
-      timeStyle: "medium",
-    });
+    return d.toLocaleTimeString(undefined, { timeStyle: "short" });
   } catch {
     return String(ts);
   }
@@ -27,26 +24,21 @@ function formatTimestamp(ts) {
 export default function AgentActivityFeed({ activities, onToggleExpand }) {
   if (!activities?.length) return null;
 
-  // For agent runs, filter to only show error events (result is shown by the terminal renderer)
   const all = activities.filter((a) => a.sseEvent === "error" || a.sseEvent === "action");
   if (!all.length) return null;
 
-  // Check the full activities array — Goose real output arrives as "message"
-  // or "result" events that never enter `all`, so checking only `all` keeps
-  // hasRealActivity false forever.
   const hasRealActivity = activities.some((a) => a.type !== "system");
-  // Hide system boot events once real activity has arrived — they only belong
-  // at the start of the first session; subsequent messages never emit them.
   const visible = hasRealActivity
     ? all.filter((a) => a.type !== "system")
     : all;
   if (!visible.length) return null;
 
   return (
-    <div
-      className="flex flex-col gap-2 mb-2 w-full max-w-full text-left"
-      aria-live="polite"
-    >
+    <div className="flex flex-col gap-1.5 mb-2 w-full" aria-live="polite">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5 px-0.5">
+        Thoughts &amp; Actions
+      </p>
+
       {visible.map((a) => {
         const isErr = a.sseEvent === "error";
         const isSystem = !isErr && a.type === "system";
@@ -60,42 +52,63 @@ export default function AgentActivityFeed({ activities, onToggleExpand }) {
         return (
           <div
             key={a.id}
-            className={`rounded-lg border text-sm px-2.5 py-2 sm:px-3 max-w-full break-words ${
+            className={`rounded-xl border text-sm px-3 py-2.5 max-w-full break-words ${
               isErr
-                ? "bg-red-50 border-red-200 text-red-900 dark:bg-red-950/50 dark:border-red-800 dark:text-red-100"
+                ? "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800/60"
                 : isSystem
-                  ? "bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-100"
-                  : "bg-gray-100 border-gray-200 text-gray-800 dark:bg-gray-800/80 dark:border-gray-600 dark:text-gray-100"
+                  ? "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800/60"
+                  : "bg-slate-50 border-slate-200 dark:bg-slate-800/40 dark:border-slate-700/60"
             }`}
           >
-            <div className="flex items-start gap-2 min-w-0">
-              <span className="text-base shrink-0 mt-0.5" aria-hidden="true">
+            <div className="flex items-start gap-2.5 min-w-0">
+              {/* Icon */}
+              <span className="shrink-0 text-base leading-none mt-0.5" aria-hidden="true">
                 {isErr ? "⚠️" : isActiveSystem ? <SystemSpinner /> : toolIconForType(a.type)}
               </span>
+
               <div className="flex-1 min-w-0 space-y-1">
-                <div className="text-[11px] sm:text-xs opacity-75 tabular-nums">
-                  {formatTimestamp(a.timestamp)}
-                  {a.type ? ` · ${a.type}` : ""}
-                  {isErr && a.code ? ` · ${a.code}` : ""}
+                {/* Meta row: type label + timestamp */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {a.type && (
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wide ${
+                        isErr
+                          ? "text-red-600 dark:text-red-400"
+                          : isSystem
+                            ? "text-blue-600 dark:text-blue-400"
+                            : "text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      {isActiveSystem ? "Starting up…" : a.type}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums ml-auto">
+                    {formatTimestamp(a.timestamp)}
+                    {isErr && a.code ? ` · ${a.code}` : ""}
+                  </span>
                 </div>
+
+                {/* Body */}
                 {shown ? (
-                  <pre className="whitespace-pre-wrap font-sans text-xs sm:text-sm leading-snug">
+                  <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                     {shown}
-                  </pre>
+                  </p>
                 ) : null}
+
                 {truncated ? (
                   <button
                     type="button"
-                    className="text-xs text-primary dark:text-tertiary underline cursor-pointer"
+                    className="text-xs text-blue-500 dark:text-blue-400 hover:underline cursor-pointer"
                     onClick={() => onToggleExpand(a.id)}
                   >
                     Show more
                   </button>
                 ) : null}
+
                 {a.expanded && body.length > SNIPPET ? (
                   <button
                     type="button"
-                    className="text-xs text-primary dark:text-tertiary underline cursor-pointer"
+                    className="text-xs text-blue-500 dark:text-blue-400 hover:underline cursor-pointer"
                     onClick={() => onToggleExpand(a.id)}
                   >
                     Show less
