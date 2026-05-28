@@ -12,3 +12,4 @@ agentic/containers/**/*.sif.meta.json
 agentic/containers/_out/
 # Added by code-review-graph
 .code-review-graph/
+.claude
