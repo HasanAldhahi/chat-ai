@@ -56,7 +56,7 @@ def test_health_ok(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "healthy"
-    assert body["tool_count"] == 7
+    assert body["tool_count"] == 8  # 7 original + delegate_subtask
 
 
 # --------------------------------------------------------------------------- #
@@ -122,6 +122,7 @@ EXPECTED_TOOLS = {
     "web_browse",
     "code_exec",
     "code_check",
+    "delegate_subtask",
 }
 
 

@@ -154,6 +154,16 @@ class AgentOrchestrator:
         # NOTE: Runtime forwarders expect just the base URL, they append /api/sse/{session_id}/events themselves
         sse_ingest_url = broker_url
 
+        # When the orchestrator is active, prepend the system prompt to the
+        # session prompt so Goose passes it as context to GLM-4.7 via -t TEXT.
+        if self._settings.orchestrator_enabled:
+            from app.routers.agent_chat import _ORCHESTRATOR_SYSTEM_PROMPT
+            prompt = (
+                f"[SYSTEM CONTEXT — follow these rules for this entire session]\n"
+                f"{_ORCHESTRATOR_SYSTEM_PROMPT}\n\n"
+                f"[USER TASK]\n{prompt}"
+            )
+
         env = {**spec.base_env}
         env.update(self._runtime_env(spec, session_id, user_id, prompt, sse_ingest_url))
         # Well-known vars the local executor uses to post a terminal SSE event.

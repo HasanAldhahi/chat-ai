@@ -8,10 +8,11 @@ changes. Where the broker uses ``AGENTIC_*``, this server uses
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from typing import List
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -117,6 +118,31 @@ class MCPSettings(BaseSettings):
         "and a marker is appended so the agent knows.",
     )
 
+    # --- vLLM direct access (subagent spawning + smart debug) ---------------
+    # Falls back to OPENAI_BASE_URL / OPENAI_API_KEY that the broker injects
+    # into every container via APPTAINERENV_* passthrough.
+    vllm_base_url: str = Field(
+        default="",
+        description="vLLM base URL. Resolved from OPENAI_BASE_URL if empty.",
+    )
+    vllm_api_key: str = Field(
+        default="",
+        description="vLLM API key. Resolved from OPENAI_API_KEY if empty.",
+    )
+    vllm_timeout_s: float = Field(
+        default=120.0,
+        gt=0,
+        description="Timeout for subagent and smart-debug vLLM calls.",
+    )
+
+    # --- Capability → model ID routing -------------------------------------
+    # Override via MCP_SERVER_MODEL_* env vars to match your vLLM cluster IDs.
+    model_orchestrator: str = Field(default="GLM-4.7")
+    model_coding: str = Field(default="Qwen3-Coder-30B-A3B-Instruct")
+    model_summarization: str = Field(default="Gemma-4-31B-Instruct")
+    model_vision: str = Field(default="Qwen3-Omni-30B-A3B-Instruct")
+    model_heavy_logic: str = Field(default="Qwen3.5-122B-A10B")
+
     @field_validator(
         "fs_read_roots",
         "fs_write_roots",
@@ -128,6 +154,15 @@ class MCPSettings(BaseSettings):
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
+
+    @model_validator(mode="after")
+    def _fill_vllm_from_container_env(self) -> "MCPSettings":
+        """Fall back to the OPENAI_* vars the broker injects into every container."""
+        if not self.vllm_base_url:
+            object.__setattr__(self, "vllm_base_url", os.environ.get("OPENAI_BASE_URL", ""))
+        if not self.vllm_api_key:
+            object.__setattr__(self, "vllm_api_key", os.environ.get("OPENAI_API_KEY", ""))
+        return self
 
 
 @lru_cache

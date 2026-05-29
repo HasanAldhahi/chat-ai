@@ -15,11 +15,15 @@ expects when asking "is this code OK?".
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from typing import Any, Dict, List
 
 from .. import config
+from .. import vllm_client
 from ..errors import ToolError, ToolErrorCode
+
+log = logging.getLogger("agentic.mcp.code")
 
 
 def _settings():
@@ -31,6 +35,39 @@ def _truncate(stream: bytes, cap: int) -> tuple[str, bool]:
         return stream.decode("utf-8", errors="replace"), False
     head = stream[:cap].decode("utf-8", errors="replace")
     return head + f"\n[...truncated, {len(stream) - cap} bytes dropped]", True
+
+
+# --------------------------------------------------------------------------- #
+# smart debug helper (Objective 3)                                            #
+# --------------------------------------------------------------------------- #
+
+async def _smart_debug_hint(code: str, stdout: str, stderr: str, s) -> str:
+    """Ask Qwen Coder to explain the failure and suggest a fix.
+
+    Non-blocking in the sense that failure to reach vLLM degrades gracefully —
+    the caller still gets the original exit_code/stdout/stderr; the hint is
+    best-effort.
+    """
+    prompt = (
+        "The following Python code failed. "
+        "Explain exactly why it failed and provide the corrected code snippet.\n\n"
+        f"## Code\n```python\n{code}\n```\n\n"
+        f"## stdout\n{stdout or '(empty)'}\n\n"
+        f"## stderr\n{stderr or '(empty)'}"
+    )
+    try:
+        return await vllm_client.call(
+            model=s.model_coding,
+            messages=[{"role": "user", "content": prompt}],
+            base_url=s.vllm_base_url,
+            api_key=s.vllm_api_key,
+            # Cap debug hints at 30 s to not block the orchestrator loop.
+            timeout_s=min(s.vllm_timeout_s, 30.0),
+            temperature=0.2,
+        )
+    except vllm_client.VllmCallError as exc:
+        log.warning("smart_debug_hint_unavailable", extra={"error": str(exc)})
+        return f"[smart_debug unavailable: {exc}]"
 
 
 # --------------------------------------------------------------------------- #
@@ -96,7 +133,7 @@ async def code_exec(args: Dict[str, Any]) -> Dict[str, Any]:
             },
         )
 
-    return {
+    result: Dict[str, Any] = {
         "exit_code": proc.returncode,
         "stdout": stdout,
         "stderr": stderr,
@@ -104,6 +141,11 @@ async def code_exec(args: Dict[str, Any]) -> Dict[str, Any]:
         "stderr_truncated": stderr_trunc,
         "timeout_s": timeout,
     }
+
+    if proc.returncode != 0:
+        result["smart_debug_hint"] = await _smart_debug_hint(code, stdout, stderr, s)
+
+    return result
 
 
 # --------------------------------------------------------------------------- #

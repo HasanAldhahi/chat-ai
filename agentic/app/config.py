@@ -123,6 +123,22 @@ class Settings(BaseSettings):
         description="NO_PROXY for agent jobs — loopback MCP + vLLM hostname.",
     )
 
+    # --- Orchestrator (multi-agent routing) --------------------------------
+    orchestrator_model: str = Field(
+        default="GLM-4.7",
+        description=(
+            "LLM model ID forced onto all agent sessions as the Master Orchestrator. "
+            "Override with AGENTIC_ORCHESTRATOR_MODEL to match your vLLM cluster."
+        ),
+    )
+    orchestrator_enabled: bool = Field(
+        default=True,
+        description=(
+            "When True, override every agent request's llm_model to orchestrator_model "
+            "and inject the orchestrator system prompt into the session."
+        ),
+    )
+
     # --- vLLM / OpenAI-compatible inference (Task 2.6) ---------------------
     vllm_base_url: str = Field(
         default="",

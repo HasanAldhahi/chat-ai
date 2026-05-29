@@ -18,6 +18,7 @@ from typing import Any, Awaitable, Callable, Dict, List
 
 from . import code as code_tools
 from . import fs as fs_tools
+from . import subagent as subagent_tools
 from . import web as web_tools
 
 
@@ -144,6 +145,37 @@ TOOLS: List[Tool] = [
             "required": ["code"],
         },
         fn=code_tools.code_exec,
+    ),
+    Tool(
+        name="delegate_subtask",
+        description=(
+            "Delegate a task to a specialist subagent model running on the vLLM cluster. "
+            "Use this instead of solving heavy tasks yourself. "
+            "Specialists: 'coding' = Qwen Coder (code/math), "
+            "'summarization' = Gemma 4 (summaries/text), "
+            "'vision' = Qwen Omni (images/multimodal), "
+            "'heavy_logic' = Qwen 3.5 122B (deep reasoning/planning)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "task_description": {
+                    "type": "string",
+                    "description": (
+                        "Complete, self-contained prompt for the subagent. "
+                        "Include all context — the subagent has zero conversation history."
+                    ),
+                },
+                "capability": {
+                    "type": "string",
+                    "enum": ["coding", "summarization", "vision", "heavy_logic"],
+                    "description": "Which specialist to invoke.",
+                },
+            },
+            "required": ["task_description", "capability"],
+            "additionalProperties": False,
+        },
+        fn=subagent_tools.delegate_subtask,
     ),
     Tool(
         name="code_check",

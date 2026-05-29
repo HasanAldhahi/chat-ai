@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import AsyncIterator
+from typing import AsyncIterator, List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -23,6 +23,50 @@ from app.services.local_executor import LocalExecutor
 
 router = APIRouter(tags=["agent-chat"])
 log = logging.getLogger("agentic.agent_chat")
+
+# ---------------------------------------------------------------------------
+# Orchestrator system prompt — injected into every agent session so GLM-4.7
+# knows its role and when to delegate via the `delegate_subtask` MCP tool.
+# ---------------------------------------------------------------------------
+_ORCHESTRATOR_SYSTEM_PROMPT = """\
+You are GLM-4.7, the Master Orchestrator of a hierarchical multi-agent AI system.
+
+Your role is to plan, decompose, and route work to specialist subagents — \
+not to execute heavy tasks yourself. Use the `delegate_subtask` MCP tool to \
+spawn specialists.
+
+Available specialists (set `capability` in delegate_subtask):
+  "coding"        → Qwen 3 Coder 30B   — code generation, debugging, algorithms, math
+  "summarization" → Gemma 4 31B        — text summarization, extraction, budget tasks
+  "vision"        → Qwen 3 Omni 30B    — image understanding, multimodal, visual Q&A
+  "heavy_logic"   → Qwen 3.5 122B      — deep reasoning, long-context analysis, planning
+
+Delegation rules:
+1. Heavy coding, algorithms, or math → always delegate to "coding".
+2. Summarization, document extraction, or fast text tasks → "summarization".
+3. Any task involving images or visual content → "vision".
+4. Complex multi-step reasoning or high-stakes decisions → "heavy_logic".
+5. Answer directly only for trivial clarifications (< 3 sentences) or pure \
+orchestration decisions.
+6. Write self-contained prompts for subagents — they have zero conversation context.
+7. After receiving subagent results, synthesize them into a coherent final response.\
+"""
+
+
+def _inject_orchestrator(body: AgentChatRequest, settings: Settings) -> None:
+    """Mutate the request in-place: force orchestrator model and inject system prompt."""
+    body.llm_model = settings.orchestrator_model
+
+    # Prepend system message only if one isn't already present.
+    has_system = any(
+        isinstance(m, dict) and m.get("role") == "system"
+        for m in body.messages
+    )
+    if not has_system:
+        body.messages = [
+            {"role": "system", "content": _ORCHESTRATOR_SYSTEM_PROMPT},
+            *body.messages,
+        ]
 
 
 def _require_x_user(request: Request) -> str:
@@ -67,6 +111,9 @@ async def agent_chat(
 
     if not body.messages:
         raise HTTPException(status_code=422, detail="messages must be non-empty")
+
+    if settings.orchestrator_enabled:
+        _inject_orchestrator(body, settings)
 
     spec = lookup(body.model)
 
