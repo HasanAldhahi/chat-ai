@@ -125,7 +125,7 @@ class Settings(BaseSettings):
 
     # --- Orchestrator (multi-agent routing) --------------------------------
     orchestrator_model: str = Field(
-        default="GLM-4.7",
+        default="glm-4.7",
         description=(
             "LLM model ID forced onto all agent sessions as the Master Orchestrator. "
             "Override with AGENTIC_ORCHESTRATOR_MODEL to match your vLLM cluster."
