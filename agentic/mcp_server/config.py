@@ -137,7 +137,7 @@ class MCPSettings(BaseSettings):
 
     # --- Capability → model ID routing -------------------------------------
     # Override via MCP_SERVER_MODEL_* env vars to match your vLLM cluster IDs.
-    model_orchestrator: str = Field(default="glm-4.7")
+    model_orchestrator: str = Field(default="qwen3.5-27b")
     model_coding: str = Field(default="qwen3-coder-30b-a3b-instruct")
     model_summarization: str = Field(default="gemma-4-31b-it")
     model_vision: str = Field(default="qwen3-omni-30b-a3b-instruct")

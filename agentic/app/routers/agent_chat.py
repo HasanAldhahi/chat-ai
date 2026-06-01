@@ -29,7 +29,7 @@ log = logging.getLogger("agentic.agent_chat")
 # knows its role and when to delegate via the `delegate_subtask` MCP tool.
 # ---------------------------------------------------------------------------
 _ORCHESTRATOR_SYSTEM_PROMPT = """\
-You are GLM-4.7, the Master Orchestrator of a hierarchical multi-agent AI system.
+You are Qwen 3.5 27B, the Master Orchestrator of a hierarchical multi-agent AI system.
 
 Your role is to plan, decompose, and route work to specialist subagents — \
 not to execute heavy tasks yourself. Use the `delegate_subtask` MCP tool to \

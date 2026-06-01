@@ -273,6 +273,11 @@ class LocalExecutor:
                 if k in ("GOOSE_SESSION_PROMPT", "APPTAINERENV_GOOSE_SESSION_PROMPT"):
                     continue
                 env[f"APPTAINERENV_{k}"] = v
+            # env.update(req.environment) above already set APPTAINERENV_GOOSE_SESSION_PROMPT.
+            # Remove it explicitly — the prompt is delivered via file to prevent
+            # apptainer's shell-based env injector from interpreting backticks in
+            # the prompt text as command substitution (exec errors at container start).
+            env.pop("APPTAINERENV_GOOSE_SESSION_PROMPT", None)
             env["APPTAINERENV_GOOSE_SESSION_PROMPT_FILE"] = "/workspace/prompt.txt"
             env.setdefault("APPTAINERENV_GOOSE_MCP_UVICORN_PORT", str(mcp_port))
             env.setdefault("APPTAINERENV_GOOSE_MCP_SERVER_URL", f"http://127.0.0.1:{mcp_port}")
