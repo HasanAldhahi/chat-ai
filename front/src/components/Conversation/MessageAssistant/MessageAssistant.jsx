@@ -447,6 +447,25 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
                   onToggleExpand={toggleAgentActivity}
                 />
               )}
+              {isAgentMessage && message?.agentModel?.model && (
+                <div className="flex items-center gap-2 px-1 -mb-2">
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wide font-medium">
+                    {{
+                      orchestrator: "🧠",
+                      coding: "💻",
+                      summarization: "📝",
+                      vision: "👁️",
+                      heavy_logic: "⚙️",
+                    }[message.agentModel.capability] ?? "🤖"}
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                    {message.agentModel.model}
+                  </span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 opacity-70">
+                    · {message.agentModel.capability}
+                  </span>
+                </div>
+              )}
               {isAgentMessage ? (
                 <GooseTerminalRenderer
                   text={message.content[0]?.text}

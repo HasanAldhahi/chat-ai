@@ -165,6 +165,7 @@ const SSE_EVENTS = new Set([
   "message",
   "assistant.delta",
   "assistant.final",
+  "model.active",
 ]);
 
 export function isAgentSseEventName(name) {

@@ -89,6 +89,30 @@ def _build_goose_env(settings: cfg_module.GooseSettings) -> dict:
     return env
 
 
+async def _post_model_event(
+    broker_sse_url: str,
+    session_id: str,
+    user_id: str,
+    model: str,
+    capability: str = "orchestrator",
+    *,
+    timeout_s: float = 5.0,
+) -> None:
+    """Emit model.active SSE event so the frontend knows which LLM is running."""
+    if not broker_sse_url or not model:
+        return
+    url = broker_sse_url.rstrip("/") + f"/api/sse/{session_id}/events"
+    headers: dict = {"Content-Type": "application/json"}
+    if user_id:
+        headers["X-User"] = user_id
+    body = {"event": "model.active", "data": {"model": model, "capability": capability}}
+    try:
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
+            await client.post(url, json=body, headers=headers, timeout=timeout_s)
+    except Exception:
+        pass
+
+
 async def _post_status_event(
     broker_sse_url: str,
     session_id: str,
@@ -176,6 +200,14 @@ async def run(settings: Optional[cfg_module.GooseSettings] = None) -> int:
         settings.user_id,
         "Initializing Goose reasoning engine...",
     )
+    if settings.llm_model:
+        await _post_model_event(
+            settings.broker_sse_url or "",
+            settings.session_id,
+            settings.user_id,
+            settings.llm_model,
+            capability="orchestrator",
+        )
 
     argv = _build_goose_argv(settings)
     proc = await asyncio.create_subprocess_exec(

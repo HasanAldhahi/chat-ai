@@ -13,8 +13,11 @@ without touching code.
 from __future__ import annotations
 
 import logging
+import os
 from enum import Enum
 from typing import Any, Dict
+
+import httpx
 
 from .. import vllm_client
 from ..config import get_settings
@@ -74,6 +77,22 @@ async def delegate_subtask(args: Dict[str, Any]) -> Dict[str, Any]:
             "task_len": len(task_description),
         },
     )
+
+    # Notify the frontend which specialist model is now active.
+    _session_id = os.environ.get("GOOSE_SESSION_ID", "")
+    _broker_url = os.environ.get("GOOSE_BROKER_SSE_URL", "")
+    _user_id = os.environ.get("GOOSE_USER_ID", "")
+    if _session_id and _broker_url:
+        _sse_url = _broker_url.rstrip("/") + f"/api/sse/{_session_id}/events"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as _client:
+                await _client.post(
+                    _sse_url,
+                    json={"event": "model.active", "data": {"model": model, "capability": capability}},
+                    headers={"X-User": _user_id, "Content-Type": "application/json"},
+                )
+        except Exception:
+            pass
 
     try:
         result = await vllm_client.call(

@@ -377,6 +377,24 @@ const sendMessage = async ({
           onFrame: (frame) => {
             if (!isAgentSseEventName(frame.event)) return;
 
+            // model.active: which LLM model is currently handling the request
+            if (frame.event === "model.active") {
+              const agentModel = {
+                model: frame.data?.model || "",
+                capability: frame.data?.capability || "orchestrator",
+              };
+              setLocalState((prev) => {
+                if (prev.id !== conversationId) return prev;
+                const messages = [...prev.messages];
+                const idx = messages.length - 2;
+                const row = messages[idx];
+                if (!row || row.role !== "assistant") return prev;
+                messages[idx] = { ...row, agentModel };
+                return { ...prev, messages, ignoreConflict: true };
+              });
+              return;
+            }
+
             // message: goose stdout line → append to bubble text, no activity row
             if (frame.event === "message") {
               if (agentResolved) return; // response already finalised

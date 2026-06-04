@@ -15,6 +15,7 @@ class SseEventName(str, Enum):
     RESULT = "result"
     ERROR = "error"
     MESSAGE = "message"
+    MODEL_ACTIVE = "model.active"
 
 
 class SsePublishRequest(BaseModel):
