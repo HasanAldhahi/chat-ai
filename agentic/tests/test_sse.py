@@ -217,6 +217,77 @@ async def test_hub_publish_action_event_received_by_subscriber():
 
 
 @pytest.mark.asyncio
+async def test_hub_replays_recent_events_to_late_subscriber():
+    """A subscriber that connects after the container already published events
+    (e.g. model.active / boot status) still receives them via the replay buffer."""
+    settings = Settings(
+        sse_heartbeat_interval_s=60.0,
+        sse_publish_rate_per_session=100,
+    )
+    hub = SseHub(settings)
+
+    # Publish BEFORE anyone subscribes — would be lost without the replay buffer.
+    await hub.publish(
+        "late",
+        SsePublishRequest(
+            event=SseEventName.MODEL_ACTIVE,
+            data={"model": "qwen3.5-27b", "capability": "orchestrator", "phase": "start"},
+        ),
+    )
+
+    received: List[bytes] = []
+
+    async def consume() -> None:
+        async for chunk in hub.subscribe("late"):
+            received.append(chunk)
+            if len(received) >= 2:  # connect comment + replayed frame
+                return
+
+    await asyncio.wait_for(asyncio.create_task(consume()), timeout=1.0)
+    await hub.aclose()
+
+    assert received[0] == b": connected\n\n"
+    frame = received[1].decode("utf-8")
+    assert "event: model.active" in frame
+    data_line = next(line for line in frame.splitlines() if line.startswith("data:"))
+    payload = json.loads(data_line[len("data: ") :])
+    assert payload["model"] == "qwen3.5-27b"
+    assert payload["capability"] == "orchestrator"
+
+
+@pytest.mark.asyncio
+async def test_hub_reset_replay_drops_previous_turn_events():
+    """reset_replay clears the buffer so a new turn's subscriber does not replay
+    the previous turn's events."""
+    settings = Settings(
+        sse_heartbeat_interval_s=0.2,  # short so the consumer falls through to keepalive
+        sse_publish_rate_per_session=100,
+    )
+    hub = SseHub(settings)
+
+    await hub.publish(
+        "turn",
+        SsePublishRequest(event=SseEventName.MESSAGE, data={"text": "old turn"}),
+    )
+    await hub.reset_replay("turn")
+
+    received: List[bytes] = []
+
+    async def consume() -> None:
+        async for chunk in hub.subscribe("turn"):
+            received.append(chunk)
+            if len(received) >= 2:  # connect comment + keepalive (no replay)
+                return
+
+    await asyncio.wait_for(asyncio.create_task(consume()), timeout=2.0)
+    await hub.aclose()
+
+    assert received[0] == b": connected\n\n"
+    # No replayed data frame — the next chunk is a keepalive comment, not an event.
+    assert received[1] == b": keepalive\n\n"
+
+
+@pytest.mark.asyncio
 async def test_hub_supports_result_and_error_events():
     settings = Settings(
         sse_heartbeat_interval_s=60.0,

@@ -46,6 +46,12 @@ log = logging.getLogger("agentic.sse")
 # Sentinel pushed onto a subscriber queue to signal "you've been disconnected".
 _CLOSE = object()
 
+# How many recent frames to retain per room so a subscriber that connects a
+# moment after the container starts still receives the early events (model.active,
+# boot status, first tool actions) it would otherwise miss. Cleared at the start
+# of each new turn so a previous turn's events never replay into a new one.
+_REPLAY_MAX = 200
+
 
 class SseRateLimitedError(Exception):
     """Raised when a session exceeds ``sse_publish_rate_per_session``."""
@@ -81,6 +87,8 @@ class _Room:
 
     session_id: str
     subscribers: List[asyncio.Queue] = field(default_factory=list)
+    # Ring buffer of recent frames, replayed to late-joining subscribers.
+    recent: Deque["_Frame"] = field(default_factory=lambda: deque(maxlen=_REPLAY_MAX))
     publishes_window: Deque[float] = field(default_factory=deque)
     last_activity_ts: float = field(default_factory=time.monotonic)
     total_published: int = 0
@@ -169,6 +177,18 @@ class SseHub:
         """
         await self._get_or_create_room(session_id, user_id=user_id)
 
+    async def reset_replay(self, session_id: str) -> None:
+        """Drop the replay buffer for a session.
+
+        Called at the start of a new turn so the next subscriber does not
+        replay the previous turn's events (session_id is reused per chat).
+        Live subscribers are untouched.
+        """
+        async with self._lock:
+            room = self._rooms.get(session_id)
+            if room is not None:
+                room.recent.clear()
+
     # ----------------------------------------------------------- publish ----
     async def publish(
         self,
@@ -195,6 +215,8 @@ class SseHub:
             data=json.dumps(request.data, ensure_ascii=False),
             id=request.id,
         )
+        # Retain for replay so a subscriber connecting a beat later still sees it.
+        room.recent.append(frame)
         delivered = 0
         for q in list(room.subscribers):
             try:
@@ -241,6 +263,10 @@ class SseHub:
         queue: asyncio.Queue = asyncio.Queue(
             maxsize=self._settings.sse_subscriber_queue_size
         )
+        # Snapshot recent frames BEFORE registering the queue so this subscriber
+        # gets every prior event exactly once (no await between the two lines
+        # means no publish can interleave and cause a duplicate or a gap).
+        replay = list(room.recent)
         room.subscribers.append(queue)
         room.last_activity_ts = time.monotonic()
         log.info(
@@ -248,20 +274,25 @@ class SseHub:
             extra={
                 "session_id": session_id,
                 "subscribers": len(room.subscribers),
+                "replayed": len(replay),
             },
         )
         try:
-            async for chunk in self._stream_frames(session_id, queue):
+            async for chunk in self._stream_frames(session_id, queue, replay):
                 yield chunk
         finally:
             await self._unsubscribe(session_id, queue)
 
     async def _stream_frames(
-        self, session_id: str, queue: asyncio.Queue
+        self, session_id: str, queue: asyncio.Queue, replay: Optional[List["_Frame"]] = None
     ) -> AsyncIterator[bytes]:
         # Initial comment kicks browsers / proxies into "stream mode" and
         # lets the test client see a non-empty first chunk immediately.
         yield b": connected\n\n"
+
+        # Replay events the container emitted before this client connected.
+        for frame in replay or ():
+            yield self._encode_frame(frame)
 
         heartbeat = self._settings.sse_heartbeat_interval_s
         while True:

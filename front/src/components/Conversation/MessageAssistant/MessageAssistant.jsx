@@ -13,6 +13,7 @@ import { useToast } from "../../../hooks/useToast";
 import FeedbackButtons from "./FeedbackButtons";
 import ForkButton from "./ForkButton";
 import AgentActivityFeed from "./AgentActivityFeed";
+import AgentModelBar from "./AgentModelBar";
 import GooseTerminalRenderer from "./GooseTerminalRenderer";
 import { isChatAiAgentModel } from "../../../constants/chatAiAgentModels";
 import { useTranslation } from "react-i18next";
@@ -327,6 +328,11 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
           className={`flex flex-col
             ${loading ? "pb-4" : "pb-3"}`}
         >
+          {isAgentMessage && message?.agentModels?.length > 0 && (
+            <div className="mb-2">
+              <AgentModelBar models={message.agentModels} />
+            </div>
+          )}
           {hasAgentUi && (
             <AgentActivityFeed
               activities={agentActivities}
@@ -447,24 +453,8 @@ export default React.memo(({ localState, setLocalState, message_index }) => {
                   onToggleExpand={toggleAgentActivity}
                 />
               )}
-              {isAgentMessage && message?.agentModel?.model && (
-                <div className="flex items-center gap-2 px-1 -mb-2">
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wide font-medium">
-                    {{
-                      orchestrator: "🧠",
-                      coding: "💻",
-                      summarization: "📝",
-                      vision: "👁️",
-                      heavy_logic: "⚙️",
-                    }[message.agentModel.capability] ?? "🤖"}
-                  </span>
-                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                    {message.agentModel.model}
-                  </span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 opacity-70">
-                    · {message.agentModel.capability}
-                  </span>
-                </div>
+              {isAgentMessage && message?.agentModels?.length > 0 && (
+                <AgentModelBar models={message.agentModels} />
               )}
               {isAgentMessage ? (
                 <GooseTerminalRenderer

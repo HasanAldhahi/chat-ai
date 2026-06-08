@@ -105,7 +105,10 @@ async def _post_model_event(
     headers: dict = {"Content-Type": "application/json"}
     if user_id:
         headers["X-User"] = user_id
-    body = {"event": "model.active", "data": {"model": model, "capability": capability}}
+    body = {
+        "event": "model.active",
+        "data": {"model": model, "capability": capability, "phase": "start"},
+    }
     try:
         async with httpx.AsyncClient(timeout=timeout_s) as client:
             await client.post(url, json=body, headers=headers, timeout=timeout_s)
@@ -200,12 +203,16 @@ async def run(settings: Optional[cfg_module.GooseSettings] = None) -> int:
         settings.user_id,
         "Initializing Goose reasoning engine...",
     )
-    if settings.llm_model:
+    # The model Goose actually runs as the orchestrator. settings.llm_model maps
+    # to GOOSE_LLM_MODEL (rarely set); the broker injects the real model as
+    # GOOSE_MODEL, so fall back to that so the frontend always gets a chip.
+    orchestrator_model = settings.llm_model or os.environ.get("GOOSE_MODEL", "")
+    if orchestrator_model:
         await _post_model_event(
             settings.broker_sse_url or "",
             settings.session_id,
             settings.user_id,
-            settings.llm_model,
+            orchestrator_model,
             capability="orchestrator",
         )
 

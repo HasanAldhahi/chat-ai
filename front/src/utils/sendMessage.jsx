@@ -360,6 +360,19 @@ const sendMessage = async ({
       const resolveAgent = (payload) => {
         if (agentResolved) return;
         agentResolved = true;
+        // Session over — any model still marked "running" has finished now.
+        setLocalState((prev) => {
+          if (prev.id !== conversationId) return prev;
+          const messages = [...prev.messages];
+          const idx = messages.length - 2;
+          const row = messages[idx];
+          if (!row || row.role !== "assistant" || !row.agentModels?.length) return prev;
+          const list = row.agentModels.map((m) =>
+            m.status === "running" ? { ...m, status: "done" } : m,
+          );
+          messages[idx] = { ...row, agentModels: list };
+          return { ...prev, messages, ignoreConflict: true };
+        });
         resolveAsync202?.(payload);
         // Close SSE so events from parallel Goose jobs stop arriving.
         disposeSSE?.();
@@ -377,19 +390,37 @@ const sendMessage = async ({
           onFrame: (frame) => {
             if (!isAgentSseEventName(frame.event)) return;
 
-            // model.active: which LLM model is currently handling the request
+            // model.active: an LLM model started or finished handling the request.
+            // We keep a running list so the UI can show every model that has been
+            // active (orchestrator + each delegated specialist) with live status.
             if (frame.event === "model.active") {
-              const agentModel = {
-                model: frame.data?.model || "",
-                capability: frame.data?.capability || "orchestrator",
-              };
+              const model = frame.data?.model || "";
+              const capability = frame.data?.capability || "orchestrator";
+              const phase = frame.data?.phase || "start";
+              const task = frame.data?.task || "";
+              const error = frame.data?.error || "";
               setLocalState((prev) => {
                 if (prev.id !== conversationId) return prev;
                 const messages = [...prev.messages];
                 const idx = messages.length - 2;
                 const row = messages[idx];
                 if (!row || row.role !== "assistant") return prev;
-                messages[idx] = { ...row, agentModel };
+                const list = [...(row.agentModels || [])];
+                // Match on capability+model so re-runs of the same specialist update
+                // the existing chip instead of stacking duplicates.
+                const key = `${capability}:${model}`;
+                const at = list.findIndex((m) => m.key === key);
+                const next = {
+                  key,
+                  model,
+                  capability,
+                  status: phase === "end" ? "done" : "running",
+                  ...(task ? { task } : {}),
+                  ...(error ? { error } : {}),
+                };
+                if (at >= 0) list[at] = { ...list[at], ...next };
+                else list.push(next);
+                messages[idx] = { ...row, agentModels: list };
                 return { ...prev, messages, ignoreConflict: true };
               });
               return;
@@ -811,6 +842,7 @@ const sendMessage = async ({
           // Handle save when conversation is not active, ideally save directly into DB (TODO)
           const inactiveMsgs = [...localState.messages];
           const ia = inactiveMsgs[inactiveMsgs.length - 2]?.agentActivities;
+          const im = inactiveMsgs[inactiveMsgs.length - 2]?.agentModels;
           const messages = [...inactiveMsgs,
             {
               role: "assistant",
@@ -820,6 +852,7 @@ const sendMessage = async ({
               loading: false,
               meta,
               ...(ia?.length ? { agentActivities: ia } : {}),
+              ...(im?.length ? { agentModels: im } : {}),
               ...(agenticFailure ? { agenticError: agenticFailure } : {}),
             },
             { role: "user", content: [{ type: "text", text: "" }] },
@@ -835,12 +868,14 @@ const sendMessage = async ({
         const messages = [...prev.messages];
         const idx = messages.length - 2;
         const acts = messages[idx]?.agentActivities;
+        const mdls = messages[idx]?.agentModels;
         const baseRow = {
           role: "assistant",
           content: responseContent?.length
             ? responseContent
             : [{ type: "text", text: "" }],
           loading: false,
+          ...(mdls?.length ? { agentModels: mdls } : {}),
           meta,
           ...(acts?.length ? { agentActivities: acts } : {}),
         };

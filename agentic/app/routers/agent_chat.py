@@ -14,6 +14,7 @@ from app.dependencies import (
     get_agent_orchestrator,
     get_local_executor,
     get_slurm_client,
+    get_sse_hub,
 )
 from app.models.agent_chat import AgentChatRequest
 from app.models.job import CancelReason
@@ -98,6 +99,7 @@ async def agent_chat(
     orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
     executor: LocalExecutor = Depends(get_local_executor),
     slurm=Depends(get_slurm_client),
+    hub=Depends(get_sse_hub),
 ) -> JSONResponse | StreamingResponse:
     """Route agent chat requests.
 
@@ -129,6 +131,9 @@ async def agent_chat(
             )
 
         session_id = body.session_id or x_user.replace("@", "-")
+        # New turn: drop the previous turn's replay buffer so its events don't
+        # get re-sent to the browser when it subscribes for this turn.
+        await hub.reset_replay(session_id)
         prompt = _extract_prompt(body)
         log.info(
             "agent_chat.debug",

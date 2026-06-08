@@ -78,21 +78,8 @@ async def delegate_subtask(args: Dict[str, Any]) -> Dict[str, Any]:
         },
     )
 
-    # Notify the frontend which specialist model is now active.
-    _session_id = os.environ.get("GOOSE_SESSION_ID", "")
-    _broker_url = os.environ.get("GOOSE_BROKER_SSE_URL", "")
-    _user_id = os.environ.get("GOOSE_USER_ID", "")
-    if _session_id and _broker_url:
-        _sse_url = _broker_url.rstrip("/") + f"/api/sse/{_session_id}/events"
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as _client:
-                await _client.post(
-                    _sse_url,
-                    json={"event": "model.active", "data": {"model": model, "capability": capability}},
-                    headers={"X-User": _user_id, "Content-Type": "application/json"},
-                )
-        except Exception:
-            pass
+    # Notify the frontend that this specialist model has started.
+    await _post_model_event(model, capability, phase="start", task=task_description)
 
     try:
         result = await vllm_client.call(
@@ -107,6 +94,8 @@ async def delegate_subtask(args: Dict[str, Any]) -> Dict[str, Any]:
             "subagent.call_failed",
             extra={"capability": capability, "model": model, "error": str(exc)},
         )
+        # Tell the frontend the specialist finished (with an error).
+        await _post_model_event(model, capability, phase="end", error=str(exc))
         raise ToolError(
             code=ToolErrorCode.EXEC_FAILED,
             message=f"Subagent [{capability}] call failed: {exc}",
@@ -117,8 +106,46 @@ async def delegate_subtask(args: Dict[str, Any]) -> Dict[str, Any]:
         "subagent.done",
         extra={"capability": capability, "model": model, "result_len": len(result)},
     )
+    # Tell the frontend the specialist finished successfully.
+    await _post_model_event(model, capability, phase="end")
     return {
         "capability": capability,
         "model": model,
         "result": result,
     }
+
+
+async def _post_model_event(
+    model: str,
+    capability: str,
+    *,
+    phase: str,
+    task: str = "",
+    error: str = "",
+) -> None:
+    """Tell the broker (→ browser) that a specialist model started or finished.
+
+    ``phase`` is ``"start"`` or ``"end"``; the frontend uses it to show a live
+    "running" chip while the subagent is working and mark it done afterwards.
+    Best-effort: any failure is swallowed so it never breaks the actual task.
+    """
+    session_id = os.environ.get("GOOSE_SESSION_ID", "")
+    broker_url = os.environ.get("GOOSE_BROKER_SSE_URL", "")
+    user_id = os.environ.get("GOOSE_USER_ID", "")
+    if not session_id or not broker_url:
+        return
+    sse_url = broker_url.rstrip("/") + f"/api/sse/{session_id}/events"
+    data: Dict[str, Any] = {"model": model, "capability": capability, "phase": phase}
+    if task:
+        data["task"] = task[:280]
+    if error:
+        data["error"] = error
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                sse_url,
+                json={"event": "model.active", "data": data},
+                headers={"X-User": user_id, "Content-Type": "application/json"},
+            )
+    except Exception:
+        pass
